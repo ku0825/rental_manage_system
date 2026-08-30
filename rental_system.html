@@ -3059,11 +3059,7 @@ function importJSON(input) {
       if (data.properties) state.properties = data.properties;
       if (data.taxSettings) Object.assign(state.taxSettings, data.taxSettings);
       if (data.telegram) Object.assign(state.telegram, data.telegram);
-      if (data.profile) {
-        state.profile = data.profile;
-        const ui = document.getElementById('username-input');
-        if (ui) ui.value = state.profile.displayName || '';
-      }
+      // 不覆蓋 state.profile，避免 saveUserData() 存到錯誤的帳號 key
       renderView(); saveUserData(); showToast('✅ 已匯入個人資料（'+state.properties.length+' 個房產）');
     } catch(err) { showToast('❌ 檔案格式錯誤，請選擇正確的 JSON 檔'); }
   };
