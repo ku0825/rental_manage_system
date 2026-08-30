@@ -4793,7 +4793,7 @@ function initLoginScreen() {
   const storedUser = localStorage.getItem('rentalUsername');
   if (!storedHash) {
     // First run — setup mode
-    document.getElementById('login-sub').textContent = '首次使用，請建立您的帳號';
+    document.getElementById('login-sub').textContent = '首次使用 / 已有帳號請輸入相同名稱與密碼';
     document.getElementById('login-setup-section').style.display = 'block';
   } else {
     // Returning user — login mode
@@ -4949,7 +4949,7 @@ function doLogout() {
   const storedHash = localStorage.getItem('rentalPwdHash');
   const storedUser = localStorage.getItem('rentalUsername') || '使用者';
   if (!storedHash) {
-    document.getElementById('login-sub').textContent = '首次使用，請建立您的帳號';
+    document.getElementById('login-sub').textContent = '首次使用 / 已有帳號請輸入相同名稱與密碼';
     document.getElementById('login-setup-section').style.display = 'block';
   } else {
     document.getElementById('login-sub').textContent = `歡迎回來，${storedUser}`;
