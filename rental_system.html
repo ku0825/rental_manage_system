@@ -708,6 +708,37 @@ async function fbPatch(docPath, fields) {
 const _fbS = v => ({ stringValue: String(v) });
 const _fbR = (doc, f) => doc?.fields?.[f]?.stringValue ?? null;
 
+async function fbDelete(docPath) {
+  try {
+    const r = await fetch(`${_FB_BASE}/${docPath}?key=${_FB_KEY}`, { method: 'DELETE' });
+    return r.ok;
+  } catch(e) { return false; }
+}
+
+async function fbListUsers() {
+  try {
+    const r = await fetch(`${_FB_BASE}/users?key=${_FB_KEY}`);
+    if (!r.ok) return [];
+    const json = await r.json();
+    const docs = json.documents || [];
+    return docs.map(doc => {
+      const parts = doc.name.split('/');
+      const username = parts[parts.length - 1];
+      const pwdHash  = _fbR(doc, 'pwdHash') || '';
+      const rawData  = _fbR(doc, 'userData') || '';
+      let propCount = '—', savedAt = '—';
+      if (rawData) {
+        try {
+          const d = JSON.parse(rawData);
+          if (d.properties) propCount = d.properties.length;
+          if (d.savedAt) savedAt = new Date(d.savedAt).toLocaleString('zh-TW');
+        } catch(e) {}
+      }
+      return { username, propCount, savedAt, hasPwd: !!pwdHash };
+    });
+  } catch(e) { return null; }
+}
+
 // ============================================================
 // CONSTANTS & CALCULATIONS
 // ============================================================
@@ -4656,6 +4687,14 @@ function renderAdminBody() {
       <tbody>${userRows}</tbody>
     </table>
 
+    <div class="admin-section" style="margin-top:24px;display:flex;align-items:center;justify-content:space-between">
+      <span>☁️ Firebase 雲端用戶</span>
+      <button class="admin-btn admin-btn-view" style="font-size:11px;padding:4px 10px" onclick="fbRefreshAdminList()">🔄 重新整理</button>
+    </div>
+    <div id="fb-admin-section">
+      <div style="color:rgba(255,255,255,.3);padding:12px 4px;font-size:13px">載入中…</div>
+    </div>
+
     <div class="admin-section" style="margin-top:24px">管理員密碼</div>
     <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
       <div>
@@ -4676,6 +4715,7 @@ function renderAdminBody() {
       <span style="color:rgba(255,255,255,.25);font-size:11px">⚠️ 管理員後台僅限授權人員操作，所有資料均存於本機瀏覽器</span>
       <button class="admin-close-btn" onclick="closeAdminOverlay()">✕ 離開後台</button>
     </div>`;
+  fbRefreshAdminList();
 }
 
 function adminToggleUser(uname) {
@@ -4777,6 +4817,54 @@ async function adminChangeSelfPwd() {
 
 function closeAdminOverlay() {
   document.getElementById('admin-overlay').style.display = 'none';
+}
+
+async function fbRefreshAdminList() {
+  const el = document.getElementById('fb-admin-section');
+  if (!el) return;
+  el.innerHTML = '<div style="color:rgba(255,255,255,.3);padding:12px 4px;font-size:13px">載入中…</div>';
+  const users = await fbListUsers();
+  if (users === null) {
+    el.innerHTML = '<div style="color:#ff7b7b;padding:12px 4px;font-size:13px">⚠️ 無法連線至 Firebase</div>';
+    return;
+  }
+  if (users.length === 0) {
+    el.innerHTML = '<div style="color:rgba(255,255,255,.3);padding:12px 4px;font-size:13px">Firebase 上尚無用戶資料</div>';
+    return;
+  }
+  const rows = users.map(u => `
+    <tr>
+      <td><strong style="color:#fff">${u.username}</strong></td>
+      <td>${u.propCount}</td>
+      <td>${u.savedAt}</td>
+      <td style="white-space:nowrap">
+        <button class="admin-btn admin-btn-del" onclick="fbAdminDeleteUser('${u.username}')">🗑 刪除雲端帳號</button>
+      </td>
+    </tr>`).join('');
+  el.innerHTML = `
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>用戶名稱</th>
+          <th>雲端房產數</th>
+          <th>最後同步時間</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="margin-top:6px;color:rgba(255,255,255,.2);font-size:11px">共 ${users.length} 個雲端帳號　⚠️ 刪除雲端帳號不影響本機資料</div>`;
+}
+
+async function fbAdminDeleteUser(username) {
+  if (!confirm(`確定從 Firebase 刪除「${username}」的雲端資料？\n\n本機資料不受影響，但該用戶換裝置後將無法同步。`)) return;
+  const ok = await fbDelete(`users/${username}`);
+  if (ok) {
+    showToast(`🗑 已從 Firebase 刪除「${username}」的雲端資料`);
+    fbRefreshAdminList();
+  } else {
+    showToast(`❌ 刪除失敗，請確認網路連線`);
+  }
 }
 
 // ============================================================
