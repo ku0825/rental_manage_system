@@ -614,65 +614,26 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
 // ============================================================
 // STATE
 // ============================================================
+const _DEFAULT_TAX = {
+  filingStatus: 'single', personalExemption: 97000, dependents: 0,
+  standardDeduction: 131000, salaryIncome: 0, salarySpecialDed: 218000,
+  otherIncome: 0, preTaxPaid: 0, rentalDeductMethod: 'standard',
+  savingsDeduction: 0, otherSpecialDed: 0,
+};
+function resetState() {
+  state.view = 'dashboard';
+  state.properties = [];
+  state.profile = { username: '', displayName: '' };
+  state.taxSettings = Object.assign({}, _DEFAULT_TAX);
+  state.telegram = { botToken: '', chatId: '', alertDays: 90 };
+  state.editingId = null;
+}
+
 const state = {
   view: 'dashboard',
   profile: { username: '', displayName: '' },
-  properties: [
-    {
-      id: 'p1', name: '大安區電梯兩房',
-      city: '台北市', district: '大安區', address: '和平東路二段',
-      type: '電梯大樓', sizePin: 33.5, rooms: 2, living: 1, bath: 1, floor: 8, totalFloors: 14,
-      parking: 'included', parkingFee: 0, parkingNo: 'B2-15',
-      rent: 35000, tenantType: 'individual',
-      leaseStart: '2024-03-01', leaseEnd: '2026-02-28',
-      purchasePrice: 0, mortgageMonthly: 0,
-      propertyTax: 12000, landTax: 8000, loanInterest: 0,
-      manageFee: 2500, insurance: 3000, repair: 5000, depreciation: 0,
-      marketLow: 40000, marketHigh: 55000,
-      marketAnalysis: '【深度搜尋更新 2026/08】大安區兩房（30-35坪）市場均租約 40,000–55,000/月（好房Housefun 成交均價 $1,769/坪）。目前本房租金 $35,000 低於市場中位 $47,500 約 26%，建議下次換約時調漲。\n\n【區域發展】台北大巨蛋2024年正式啟用，帶動忠孝東路四段商圈升溫；大安森林公園周邊供給稀缺，學區（興雅、金華、師附中）維持強勁自住需求，空置率持續偏低，租金長期支撐力強。\n\n【建議】下次換約目標租金：$40,000–$42,000（含家電裝潢溢價）。',
-      notes: '已裝潢含家電，近捷運',
-      coOwners: [], maintenanceLogs: [], leaseFiles: [], leaseDrafts: [], rentTiers: [], rentHistory: [], lat: null, lng: null,
-    },
-    {
-      id: 'p2', name: '中山區套房（公司承租）',
-      city: '台北市', district: '中山區', address: '長安東路一段',
-      type: '電梯大樓', sizePin: 15, rooms: 1, living: 0, bath: 1, floor: 3, totalFloors: 10,
-      parking: 'none', parkingFee: 0, parkingNo: '',
-      rent: 22000, tenantType: 'company',
-      leaseStart: '2024-06-01', leaseEnd: '2025-05-31',
-      purchasePrice: 6800000, mortgageMonthly: 18000,
-      propertyTax: 6000, landTax: 4500, loanInterest: 60000,
-      manageFee: 1500, insurance: 2000, repair: 3000, depreciation: 50000,
-      marketLow: 18000, marketHigh: 26000,
-      marketAnalysis: '【深度搜尋更新 2026/08】中山區套房（13-17坪）市場均租約 18,000–26,000/月（好房Housefun 成交均價 $1,574/坪，15坪估算 $23,610）。本房租金 $22,000 位於市場中段偏低，符合行情。\n\n【區域發展】中山區捷運綠線（松山新店線）沿線需求穩健，長安商圈商辦混合，公司員工宿舍需求持續。樂居數據：近一年成交房價 $105萬/坪，中山區整體房市穩健。\n\n【建議】續約可小幅調漲至 $23,000–$24,000，公司承租穩定性高，維持關係優先。',
-      notes: '公司承租，員工宿舍',
-      coOwners: [], maintenanceLogs: [], leaseFiles: [], leaseDrafts: [], rentTiers: [], rentHistory: [], lat: null, lng: null,
-    },
-    {
-      id: 'p3', name: '新北市永和兩房一廳',
-      city: '新北市', district: '永和區', address: '竹林路',
-      type: '公寓', sizePin: 28, rooms: 2, living: 1, bath: 1, floor: 4, totalFloors: 5,
-      parking: 'separate', parkingFee: 3000, parkingNo: 'B1-08',
-      rent: 18000, tenantType: 'individual',
-      leaseStart: '2023-09-01', leaseEnd: '2025-08-31',
-      purchasePrice: 4200000, mortgageMonthly: 12000,
-      propertyTax: 5000, landTax: 3500, loanInterest: 42000,
-      manageFee: 0, insurance: 1500, repair: 8000, depreciation: 30000,
-      marketLow: 20000, marketHigh: 28000,
-      marketAnalysis: '【深度搜尋更新 2026/08】永和區兩房（25-30坪，公寓）市場均租約 $1,207/坪，28坪估算 $33,796；但老公寓較電梯大樓折價約 20-25%，合理區間 $20,000–$28,000（不含車位）。本房含車位合計 $21,000 處於市場低標。\n\n【區域發展】新北市中永和租金指數 105.6，年增率 3.23%，是新北七大次分區漲幅最大區域。頂溪捷運旁 1.67 公頃都更案總開發價值預估逾 400 億，帶動區域房市信心。永和 2024 成屋均價達 $66 萬/坪（五年累積漲 24.5%）。\n\n【建議】租約到期後目標調至 $22,000–$24,000（不含車位）或 $25,000–$27,000（含車位），訴求交通便利（頂溪捷運）及都更題材支撐。',
-      notes: '老公寓格局方正，近頂溪捷運',
-      coOwners: [], maintenanceLogs: [
-        {id:'m1',date:'2024-10-15',category:'repair',amount:3500,desc:'浴室矽利康重做'},
-        {id:'m2',date:'2025-02-20',category:'other',amount:800,desc:'換門鎖'},
-      ], leaseFiles: [], leaseDrafts: [], rentTiers: [], rentHistory: [], lat: null, lng: null,
-    },
-  ],
-  taxSettings: {
-    filingStatus: 'single', personalExemption: 97000, dependents: 0,
-    standardDeduction: 131000, salaryIncome: 0, salarySpecialDed: 218000,
-    otherIncome: 0, preTaxPaid: 0, rentalDeductMethod: 'standard',
-    savingsDeduction: 0, otherSpecialDed: 0,
-  },
+  properties: [],
+  taxSettings: Object.assign({}, _DEFAULT_TAX),
   editingId: null,
   telegram: { botToken: '', chatId: '', alertDays: 90 },
 };
@@ -2275,6 +2236,7 @@ function _tgCheck() {
 
 async function sendTelegramTest() {
   if (!_tgCheck()) return;
+  saveUserData(); // persist token/chatId before sending
   const btn = event.target;
   btn.disabled = true; btn.textContent = '發送中…';
   try {
@@ -2290,6 +2252,7 @@ async function sendTelegramTest() {
 
 async function sendTelegramAlert() {
   if (!_tgCheck()) return;
+  saveUserData(); // persist token/chatId before sending
   const btn = document.getElementById('tg-btn');
   if (btn) { btn.disabled = true; btn.textContent = '發送中…'; }
 
@@ -4502,6 +4465,7 @@ function saveUserData() {
 
 function loadUserData(uname) {
   if (!uname) return;
+  state.properties = []; // clear before loading to avoid cross-account bleed
   const raw = localStorage.getItem('rentalUserData_' + uname);
   if (!raw) return;
   try {
@@ -4769,14 +4733,11 @@ function adminResetPwd(uname) {
   if (newPwd === null) return;
   if (newPwd.length < 6) { alert('密碼至少 6 個字元'); return; }
   hashPwd(newPwd).then(h => {
-    // We need to update the correct user's hash.
-    // Since each user's hash is stored in rentalPwdHash (shared key),
-    // we store individual user hashes under rentalPwdHash_{username}
     localStorage.setItem('rentalPwdHash_' + uname, h);
-    // If this is the current active user, also update the main key
     if (uname === localStorage.getItem('rentalUsername')) {
       localStorage.setItem('rentalPwdHash', h);
     }
+    fbPatch(`users/${uname}`, { pwdHash: _fbS(h) }); // sync to Firebase
     renderAdminBody();
     showToast(`✅「${uname}」密碼已重設`);
   });
@@ -4785,13 +4746,12 @@ function adminResetPwd(uname) {
 function adminDeleteUser(uname) {
   if (!confirm(`確定刪除用戶「${uname}」？\n此操作將移除該用戶的所有房產資料，無法復原。`)) return;
   unregisterUser(uname);
-  // Also remove their per-user pwd hash if stored separately
   localStorage.removeItem('rentalPwdHash_' + uname);
-  // If deleting current user, clear their session keys too
   if (uname === localStorage.getItem('rentalUsername')) {
     localStorage.removeItem('rentalPwdHash');
     localStorage.removeItem('rentalUsername');
   }
+  fbDelete(`users/${uname}`); // also remove from Firebase cloud
   renderAdminBody();
   showToast(`🗑「${uname}」已刪除`);
 }
@@ -4922,6 +4882,7 @@ async function doSetup() {
     errEl.textContent = '';
     document.getElementById('login-overlay').style.display = 'none';
     renderView();
+    initFS();
     showToast('☁️ 已從雲端同步帳號資料，歡迎回來！');
     return;
   }
@@ -4938,6 +4899,8 @@ async function doSetup() {
   fbPatch(`users/${uname}`, { pwdHash: _fbS(h) }); // save hash to Firebase
   errEl.textContent = '';
   document.getElementById('login-overlay').style.display = 'none';
+  renderView();
+  initFS();
   showToast('✅ 帳號建立成功，歡迎使用！');
 }
 
@@ -5026,7 +4989,7 @@ function startNewAccountSetup() {
 }
 
 function doLogout() {
-  // Reset login screen state
+  resetState(); // clear all user data from memory before showing login
   const overlay = document.getElementById('login-overlay');
   document.getElementById('login-setup-section').style.display = 'none';
   document.getElementById('login-login-section').style.display = 'none';
@@ -5068,7 +5031,10 @@ async function changePassword() {
   const newH = await hashPwd(newPwd);
   const curUser = state.profile.username;
   localStorage.setItem('rentalPwdHash', newH);
-  if (curUser) localStorage.setItem('rentalPwdHash_' + curUser, newH);
+  if (curUser) {
+    localStorage.setItem('rentalPwdHash_' + curUser, newH);
+    fbPatch(`users/${curUser}`, { pwdHash: _fbS(newH) }); // sync to Firebase
+  }
   document.getElementById('cp-old').value = '';
   document.getElementById('cp-new').value = '';
   document.getElementById('cp-new2').value = '';
