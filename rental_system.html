@@ -3166,12 +3166,16 @@ function importJSON(input) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
+      const uname = state.profile.username;
+      if (!uname) { showToast('❌ 請先登入再匯入'); return; }
       const data = JSON.parse(e.target.result);
       if (data.properties) state.properties = data.properties;
       if (data.taxSettings) Object.assign(state.taxSettings, data.taxSettings);
       if (data.telegram) Object.assign(state.telegram, data.telegram);
       // 不覆蓋 state.profile，避免 saveUserData() 存到錯誤的帳號 key
-      renderView(); saveUserData(); showToast('✅ 已匯入個人資料（'+state.properties.length+' 個房產）');
+      renderView();
+      saveUserData();
+      showToast(`✅ 已匯入 ${state.properties.length} 個房產 → 帳號：${uname}`);
     } catch(err) { showToast('❌ 檔案格式錯誤，請選擇正確的 JSON 檔'); }
   };
   reader.readAsText(file);
@@ -4532,17 +4536,18 @@ async function reconnectFolder() {
   } catch(e) { showToast('❌ ' + (e.message || e)); }
 }
 
-async function saveToFile() {
+async function saveToFile(jsonStr) {
   if (!_dirHandle) return;
   try {
-    const payload = {
-      version: '2.0', savedAt: new Date().toISOString(),
+    // Use the caller-supplied JSON (same savedAt as localStorage) if provided
+    const content = jsonStr || JSON.stringify({
+      savedAt: new Date().toISOString(),
       profile: state.profile, properties: state.properties,
       taxSettings: state.taxSettings, telegram: state.telegram,
-    };
+    }, null, 2);
     const fh = await _dirHandle.getFileHandle(FS_FILENAME, { create: true });
     const writable = await fh.createWritable();
-    await writable.write(JSON.stringify(payload, null, 2));
+    await writable.write(content);
     await writable.close();
   } catch(e) {
     console.warn('saveToFile error', e);
@@ -4556,6 +4561,14 @@ async function loadFromFile() {
     const fh = await _dirHandle.getFileHandle(FS_FILENAME);
     const file = await fh.getFile();
     const data = JSON.parse(await file.text());
+    // Only override state when file is strictly newer than localStorage.
+    // Prevents a stale file from overwriting a just-imported localStorage copy.
+    const uname = state.profile.username;
+    const localRaw = uname ? localStorage.getItem('rentalUserData_' + uname) : null;
+    let localTime = '';
+    if (localRaw) { try { localTime = JSON.parse(localRaw).savedAt || ''; } catch(e) {} }
+    const fileTime = data.savedAt || '';
+    if (fileTime < localTime) return false; // localStorage is newer — skip file
     if (data.properties) state.properties = data.properties;
     if (data.taxSettings) Object.assign(state.taxSettings, data.taxSettings);
     if (data.telegram) Object.assign(state.telegram, data.telegram);
@@ -4611,7 +4624,7 @@ function saveUserData() {
   } catch(e) { /* quota exceeded */ }
   // Sync to Firebase (fire-and-forget, no await)
   fbPatch(`users/${uname}`, { userData: _fbS(json) });
-  saveToFile(); // async, fire-and-forget — writes rental_data.json in chosen folder
+  saveToFile(json); // pass same JSON so file's savedAt matches localStorage
 }
 
 function loadUserData(uname) {
