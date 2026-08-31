@@ -347,6 +347,20 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
 .mc-tax { background: #f3e5f5; color: #7c3aed; }
 .mc-other { background: #eee; color: #555; }
 
+/* Maintenance photo grid */
+.maint-photo-grid { display:flex;flex-wrap:wrap;gap:6px;margin-top:6px; }
+.maint-thumb { width:60px;height:60px;border-radius:7px;object-fit:cover;cursor:pointer;border:2px solid #eee;transition:border-color .15s,transform .15s; }
+.maint-thumb:hover { border-color:var(--primary);transform:scale(1.06); }
+.maint-notes { font-size:11px;color:#666;font-style:italic;padding:3px 0 0;line-height:1.45;width:100%; }
+.maint-photo-add { display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:7px;border:2px dashed #ccc;cursor:pointer;font-size:22px;color:#aaa;background:#fafafa;transition:border-color .15s,color .15s; }
+.maint-photo-add:hover { border-color:var(--primary);color:var(--primary); }
+.maint-photo-wrap { position:relative;display:inline-block; }
+.maint-photo-del { position:absolute;top:-5px;right:-5px;width:17px;height:17px;background:#c0392b;color:#fff;border:none;border-radius:50%;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1; }
+/* Photo lightbox */
+.photo-lb { position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out; }
+.photo-lb img { max-width:92vw;max-height:90vh;border-radius:8px;object-fit:contain;cursor:default; }
+.photo-lb-close { position:absolute;top:18px;right:24px;color:#fff;font-size:30px;cursor:pointer;background:none;border:none;line-height:1; }
+
 /* Cashflow view */
 .cf-prop-row { display: grid; grid-template-columns: 2fr repeat(6,1fr); gap: 0; font-size: 12px; }
 .cf-cell { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
@@ -538,7 +552,7 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
 
 <!-- Maintenance Log Modal -->
 <div class="modal-overlay" id="maint-modal" style="display:none">
-  <div class="modal-box" style="max-width:420px">
+  <div class="modal-box" style="max-width:520px">
     <div class="modal-hdr"><span id="maint-modal-title">🔧 新增修繕記錄</span><button class="modal-close" onclick="closeMaintModal()">✕</button></div>
     <div class="modal-body" style="padding:20px">
       <div class="frow" style="grid-template-columns:1fr 1fr">
@@ -555,10 +569,21 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
       <div class="frow" style="grid-template-columns:1fr">
         <div class="fg"><label>金額（選填）</label><div class="pfx-wrap"><span class="pfx">$</span><input type="number" id="maint-amount" min="0" placeholder="0"></div></div>
         <div class="fg"><label>說明 <span style="color:var(--red)">*</span></label><input type="text" id="maint-desc" placeholder="例：廚房水管修繕"></div>
+        <div class="fg"><label>備註（選填）</label><textarea id="maint-notes" rows="2" placeholder="詳細說明、廠商資訊、保固期限…" style="resize:vertical;font-size:13px"></textarea></div>
+      </div>
+      <div class="fg" style="margin-top:6px">
+        <label>照片（最多 5 張）</label>
+        <div id="maint-photo-preview"></div>
       </div>
     </div>
     <div class="modal-foot"><button class="btn-ghost" onclick="closeMaintModal()">取消</button><button class="btn-pri" onclick="saveMaintLog()">儲存記錄</button></div>
   </div>
+</div>
+
+<!-- Photo Lightbox -->
+<div class="photo-lb" id="photo-lb" style="display:none" onclick="closeMaintPhotoLb()">
+  <button class="photo-lb-close" onclick="closeMaintPhotoLb()">✕</button>
+  <img src="" alt="照片預覽" onclick="event.stopPropagation()">
 </div>
 
 <!-- Lease Files Modal -->
@@ -1265,9 +1290,11 @@ function attachCashflowCharts() {
 // MAINTENANCE LOG
 // ============================================================
 let _maintModal = {propId: null};
+let _maintPhotos = []; // staging photos while modal is open
 
 function openMaintModal(propId) {
   _maintModal.propId = propId;
+  _maintPhotos = [];
   const p = state.properties.find(x=>x.id===propId);
   if (!p) return;
   document.getElementById('maint-modal-title').textContent = `🔧 新增記錄：${p.name}`;
@@ -1275,9 +1302,106 @@ function openMaintModal(propId) {
   document.getElementById('maint-category').value = 'repair';
   document.getElementById('maint-amount').value = '';
   document.getElementById('maint-desc').value = '';
+  document.getElementById('maint-notes').value = '';
+  renderMaintPhotoGrid();
   document.getElementById('maint-modal').style.display = 'flex';
 }
-function closeMaintModal() { document.getElementById('maint-modal').style.display='none'; }
+function closeMaintModal() {
+  _maintPhotos = [];
+  document.getElementById('maint-modal').style.display = 'none';
+}
+
+async function handleMaintPhotoUpload(input) {
+  const files = Array.from(input.files);
+  const MAX = 5;
+  const remaining = MAX - _maintPhotos.length;
+  if (remaining <= 0) { showToast('⚠️ 最多上傳 5 張照片'); input.value=''; return; }
+  for (const file of files.slice(0, remaining)) {
+    if (!file.type.startsWith('image/')) continue;
+    const data = await _compressImg(file, 1400, 0.82);
+    _maintPhotos.push({ id:'mp'+Date.now()+Math.random().toString(36).slice(2,5), name:file.name, type:file.type, data });
+  }
+  renderMaintPhotoGrid();
+  input.value = '';
+}
+
+function _compressImg(file, maxW, quality) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const full = canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', quality);
+        resolve(full.split(',')[1]);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function removeMaintPhoto(id) {
+  _maintPhotos = _maintPhotos.filter(p=>p.id!==id);
+  renderMaintPhotoGrid();
+}
+
+function renderMaintPhotoGrid() {
+  const el = document.getElementById('maint-photo-preview');
+  if (!el) return;
+  const MAX = 5;
+  const thumbs = _maintPhotos.map(ph=>`
+    <div class="maint-photo-wrap">
+      <img class="maint-thumb" src="data:${ph.type};base64,${ph.data}" title="${ph.name.replace(/"/g,'&quot;')}">
+      <button class="maint-photo-del" type="button" onclick="removeMaintPhoto('${ph.id}')" title="刪除">✕</button>
+    </div>`).join('');
+  const addBtn = _maintPhotos.length < MAX ? `
+    <label class="maint-photo-add" title="新增照片">
+      <span>＋</span>
+      <input type="file" accept="image/*" multiple style="display:none" onchange="handleMaintPhotoUpload(this)">
+    </label>` : '';
+  el.innerHTML = `<div class="maint-photo-grid">${thumbs}${addBtn}</div>`;
+}
+
+function viewMaintPhotoById(propId, logId, photoId) {
+  const p = state.properties.find(x=>x.id===propId);
+  if (!p) return;
+  const log = (p.maintenanceLogs||[]).find(l=>l.id===logId);
+  if (!log) return;
+  const ph = (log.photos||[]).find(x=>x.id===photoId);
+  if (!ph) return;
+  viewMaintPhoto(`data:${ph.type};base64,${ph.data}`);
+}
+
+function viewMaintPhoto(src) {
+  const lb = document.getElementById('photo-lb');
+  lb.querySelector('img').src = src;
+  lb.style.display = 'flex';
+}
+
+function closeMaintPhotoLb() {
+  const lb = document.getElementById('photo-lb');
+  lb.style.display = 'none';
+  lb.querySelector('img').src = '';
+}
+
+function toggleMaintAll(propId) {
+  const key = propId + '_maint_all';
+  _sectionOpen[key] = !_sectionOpen[key];
+  // re-render just the maint section in-place
+  const p = state.properties.find(x=>x.id===propId);
+  if (!p) return;
+  const container = document.getElementById('sec-' + propId + '-maint');
+  if (!container) return;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = renderMaintSection(p);
+  const newBody = tmp.querySelector('#sec-' + propId + '-maint');
+  if (newBody) container.replaceWith(newBody);
+}
 
 function saveMaintLog() {
   const p = state.properties.find(x=>x.id===_maintModal.propId);
@@ -1286,10 +1410,13 @@ function saveMaintLog() {
   const category = document.getElementById('maint-category').value;
   const amount = parseFloat(document.getElementById('maint-amount').value)||0;
   const desc = document.getElementById('maint-desc').value.trim();
+  const notes = document.getElementById('maint-notes').value.trim();
   if (!desc) { showToast('⚠️ 請填寫說明'); return; }
   if (!p.maintenanceLogs) p.maintenanceLogs = [];
-  p.maintenanceLogs.unshift({id:'m'+Date.now(), date, category, amount, desc});
+  const photos = _maintPhotos.slice();
+  p.maintenanceLogs.unshift({id:'m'+Date.now(), date, category, amount, desc, notes, photos});
   closeMaintModal();
+  saveUserData();
   renderView();
   showToast('✅ 已新增修繕記錄');
 }
@@ -1297,7 +1424,9 @@ function saveMaintLog() {
 function deleteMaintLog(propId, logId) {
   const p = state.properties.find(x=>x.id===propId);
   if (!p||!p.maintenanceLogs) return;
+  if (!confirm('確定刪除此筆記錄？')) return;
   p.maintenanceLogs = p.maintenanceLogs.filter(l=>l.id!==logId);
+  saveUserData();
   renderView();
   showToast('🗑 已刪除記錄');
 }
@@ -1499,11 +1628,36 @@ function renderPropTable() {
 
 
 function renderMaintSection(p) {
-  const logs = (p.maintenanceLogs||[]).slice(0,5);
-  const totalAmt = (p.maintenanceLogs||[]).reduce((s,l)=>s+l.amount,0);
-  const cnt = (p.maintenanceLogs||[]).length;
+  const allLogs = p.maintenanceLogs || [];
+  const totalAmt = allLogs.reduce((s,l)=>s+(l.amount||0),0);
+  const cnt = allLogs.length;
   const open = !!_sectionOpen[p.id+'_maint'];
+  const showAll = !!_sectionOpen[p.id+'_maint_all'];
+  const PAGE = 3;
+  const logs = showAll ? allLogs : allLogs.slice(0, PAGE);
   const summary = cnt ? `${cnt} 筆 · 累計 $${fmt(totalAmt)}` : '尚無記錄';
+
+  const logRows = logs.map(l => {
+    const photoCount = (l.photos||[]).length;
+    const photoThumbs = (l.photos||[]).map(ph =>
+      `<img class="maint-thumb" src="data:${ph.type};base64,${ph.data}"
+        onclick="viewMaintPhotoById('${p.id}','${l.id}','${ph.id}')"
+        title="${(ph.name||'').replace(/"/g,'&quot;')}">`
+    ).join('');
+    return `
+      <div class="maint-row" style="flex-wrap:wrap;align-items:flex-start">
+        <div style="display:flex;align-items:center;gap:8px;width:100%;flex-wrap:wrap">
+          <span class="maint-cat ${maintCatCls(l.category)}">${maintCatLabel(l.category)}</span>
+          <span style="color:#888;flex-shrink:0;font-size:11px">${fmtDate(l.date)}</span>
+          <span style="flex:1;color:#333;font-weight:500;min-width:80px">${l.desc}</span>
+          ${l.amount?`<span style="font-weight:600;color:var(--red);flex-shrink:0">-$${fmt(l.amount)}</span>`:''}
+          <button class="btn-ghost-red no-print" onclick="deleteMaintLog('${p.id}','${l.id}')" style="padding:2px 6px;font-size:10px;flex-shrink:0">✕</button>
+        </div>
+        ${l.notes?`<div class="maint-notes">${l.notes.replace(/</g,'&lt;')}</div>`:''}
+        ${photoCount?`<div class="maint-photo-grid">${photoThumbs}</div>`:''}
+      </div>`;
+  }).join('');
+
   return `
   <div class="prop-sec-hdr no-print" onclick="togglePropSection('${p.id}','maint')">
     <div class="prop-sec-title">🔧 修繕記錄 · ${summary}</div>
@@ -1516,15 +1670,9 @@ function renderMaintSection(p) {
   </div>
   <div id="sec-${p.id}-maint" style="${open?'':'display:none'};padding-bottom:4px">
     ${!cnt?'<div style="font-size:11px;color:#bbb;padding:4px 0 6px">尚無記錄</div>':''}
-    ${logs.map(l=>`
-      <div class="maint-row">
-        <span class="maint-cat ${maintCatCls(l.category)}">${maintCatLabel(l.category)}</span>
-        <span style="color:#888;flex-shrink:0">${fmtDate(l.date)}</span>
-        <span style="flex:1;color:#444">${l.desc}</span>
-        ${l.amount?`<span style="font-weight:600;color:var(--red);flex-shrink:0">-$${fmt(l.amount)}</span>`:''}
-        <button class="btn-ghost-red no-print" onclick="deleteMaintLog('${p.id}','${l.id}')" style="padding:2px 6px;font-size:10px;flex-shrink:0">✕</button>
-      </div>`).join('')}
-    ${cnt>5?`<div style="font-size:11px;color:#aaa;padding:3px 0">…另有 ${cnt-5} 筆記錄</div>`:''}
+    ${logRows}
+    ${cnt>PAGE?`<button class="btn-ghost btn-sm no-print" style="width:100%;margin-top:4px;font-size:11px"
+      onclick="toggleMaintAll('${p.id}')">${showAll?'▲ 收合':'▼ 查看全部 '+cnt+' 筆'}</button>`:''}
   </div>`;
 }
 
@@ -3457,10 +3605,10 @@ async function exportXLS() {
     const ws=wb.addWorksheet('🔧 維修記錄');
     const hdrs=[
       {l:'房產名稱',w:18},{l:'日期',w:13},{l:'類別',w:10},
-      {l:'說明',w:38},{l:'金額',w:14},
+      {l:'說明',w:30},{l:'備註',w:36},{l:'照片數',w:9},{l:'金額',w:14},
     ];
     hdrs.forEach((h,i)=>ws.getColumn(i+1).width=h.w);
-    freezeAt(ws, 5);
+    freezeAt(ws, 7);
 
     const allLogs=state.properties.flatMap(p=>(p.maintenanceLogs||[]).map(l=>({...l,propName:p.name})));
     addTitleRows(ws, '🔧 維修記錄',
@@ -3469,7 +3617,7 @@ async function exportXLS() {
     addColHdr(ws, hdrs.map(h=>h.l));
 
     if(!allLogs.length){
-      const r=ws.addRow(['尚無維修記錄','','','','']);
+      const r=ws.addRow(['尚無維修記錄','','','','','','']);
       ws.mergeCells(r.number,1,r.number,hdrs.length);
       r.height=30; r.getCell(1).style={...STYLE.note(), alignment:{horizontal:'center',vertical:'middle'}};
     } else {
@@ -3478,23 +3626,26 @@ async function exportXLS() {
       const sorted=[...allLogs].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
       sorted.forEach((log,ri)=>{
         const alt=ri%2===1;
-        const r=ws.addRow([log.propName,log.date||'—',catL(log.category),log.description||'—',log.amount||null]);
+        const photoCount=(log.photos||[]).length;
+        const r=ws.addRow([log.propName,log.date||'—',catL(log.category),log.desc||'—',log.notes||'',photoCount||'',log.amount||null]);
         r.height=20;
         r.getCell(1).style=STYLE.dataBold(alt,'left',C.navy);
         r.getCell(2).style=STYLE.data(alt,'center');
         r.getCell(3).style=STYLE.dataBold(alt,'center',catC(log.category));
         r.getCell(4).style=STYLE.data(alt);
-        if(log.amount){r.getCell(5).style=STYLE.data(alt,'right',C.accent,FMT_TWD);}
-        else{r.getCell(5).value='—';r.getCell(5).style=STYLE.data(alt,'center',C.textL);}
+        r.getCell(5).style=STYLE.data(alt,'left',C.textL);
+        r.getCell(6).style=STYLE.data(alt,'center',photoCount?C.accent:C.textL);
+        if(log.amount){r.getCell(7).style=STYLE.data(alt,'right',C.accent,FMT_TWD);}
+        else{r.getCell(7).value='—';r.getCell(7).style=STYLE.data(alt,'center',C.textL);}
       });
       const totAmt=allLogs.reduce((s,l)=>s+(l.amount||0),0);
       if(totAmt>0){
-        const rTot=ws.addRow(['合計費用','','','',totAmt]);
-        ws.mergeCells(rTot.number,1,rTot.number,4);
+        const rTot=ws.addRow(['合計費用','','','','','',totAmt]);
+        ws.mergeCells(rTot.number,1,rTot.number,6);
         rTot.height=24;
         rTot.getCell(1).style=STYLE.total(C.lightYellow,C.accent,'left');
-        rTot.getCell(5).style=STYLE.total(C.lightYellow,C.accent);
-        rTot.getCell(5).numFmt=FMT_TWD;
+        rTot.getCell(7).style=STYLE.total(C.lightYellow,C.accent);
+        rTot.getCell(7).numFmt=FMT_TWD;
       }
     }
   })();
