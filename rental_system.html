@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -3169,13 +3169,15 @@ function importJSON(input) {
       const uname = state.profile.username;
       if (!uname) { showToast('❌ 請先登入再匯入'); return; }
       const data = JSON.parse(e.target.result);
-      if (data.properties) state.properties = data.properties;
+      if (data.properties)  state.properties = data.properties;
       if (data.taxSettings) Object.assign(state.taxSettings, data.taxSettings);
-      if (data.telegram) Object.assign(state.telegram, data.telegram);
+      if (data.telegram)    Object.assign(state.telegram, data.telegram);
       // 不覆蓋 state.profile，避免 saveUserData() 存到錯誤的帳號 key
       renderView();
+      // Full JSON (including base64 binary) is saved to IndexedDB — no size limit
       saveUserData();
-      showToast(`✅ 已匯入 ${state.properties.length} 個房產 → 帳號：${uname}`);
+      const mb = (new Blob([e.target.result]).size / 1024 / 1024).toFixed(1);
+      showToast(`✅ 已匯入資料（${mb} MB），儲存至瀏覽器 IndexedDB`);
     } catch(err) { showToast('❌ 檔案格式錯誤，請選擇正確的 JSON 檔'); }
   };
   reader.readAsText(file);
@@ -4454,17 +4456,22 @@ function renderAllRentSummary() {
 // ============================================================
 const FS_FILENAME = 'rental_data.json';
 
-function openHandleDB() {
+// Central IndexedDB open — version 2 adds 'userdata' store (no size limit)
+function _openRentalDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('rentalFSDB', 1);
-    req.onupgradeneeded = e => e.target.result.createObjectStore('handles');
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror = e => reject(e.target.error);
+    const req = indexedDB.open('rentalFSDB', 2);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('handles'))  db.createObjectStore('handles');
+      if (!db.objectStoreNames.contains('userdata')) db.createObjectStore('userdata');
+    };
+    req.onsuccess  = e => resolve(e.target.result);
+    req.onerror    = e => reject(e.target.error);
   });
 }
 async function saveHandleToDB(handle) {
   try {
-    const db = await openHandleDB();
+    const db = await _openRentalDB();
     await new Promise((res, rej) => {
       const tx = db.transaction('handles', 'readwrite');
       tx.objectStore('handles').put(handle, 'dir');
@@ -4474,14 +4481,59 @@ async function saveHandleToDB(handle) {
 }
 async function loadHandleFromDB() {
   try {
-    const db = await openHandleDB();
+    const db = await _openRentalDB();
     return await new Promise((res, rej) => {
       const tx = db.transaction('handles', 'readonly');
       const req = tx.objectStore('handles').get('dir');
       req.onsuccess = e => res(e.target.result || null);
-      req.onerror = e => rej(e.target.error);
+      req.onerror   = e => rej(e.target.error);
     });
   } catch(e) { return null; }
+}
+// Save full JSON (including binary lease files) to IndexedDB — no size limit
+async function saveUserDataToDB(uname, json) {
+  try {
+    const db = await _openRentalDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction('userdata', 'readwrite');
+      tx.objectStore('userdata').put(json, uname);
+      tx.oncomplete = res; tx.onerror = rej;
+    });
+  } catch(e) { console.warn('saveUserDataToDB', e); }
+}
+// Load full JSON from IndexedDB — returns string or null
+async function loadUserDataFromDB(uname) {
+  try {
+    const db = await _openRentalDB();
+    return await new Promise((res, rej) => {
+      const tx = db.transaction('userdata', 'readonly');
+      const req = tx.objectStore('userdata').get(uname);
+      req.onsuccess = e => res(e.target.result || null);
+      req.onerror   = e => rej(e.target.error);
+    });
+  } catch(e) { return null; }
+}
+async function deleteUserDataFromDB(uname) {
+  try {
+    const db = await _openRentalDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction('userdata', 'readwrite');
+      tx.objectStore('userdata').delete(uname);
+      tx.oncomplete = res; tx.onerror = rej;
+    });
+  } catch(e) {}
+}
+// Strip binary data (base64) from payload for localStorage / Firebase (size limits)
+function _lightPayload(payload) {
+  const stripProps = (props) => (props || []).map(p => ({
+    ...p,
+    leaseFiles:  (p.leaseFiles  || []).map(f => { const {data, ...rest} = f; return rest; }),
+    leaseDrafts: (p.leaseDrafts || []).map(f => { const {data, ...rest} = f; return rest; }),
+    maintenanceLogs: (p.maintenanceLogs || []).map(l => ({
+      ...l, photos: (l.photos || []).map(ph => { const {data, ...rest} = ph; return rest; }),
+    })),
+  }));
+  return { ...payload, properties: stripProps(payload.properties) };
 }
 
 async function initFS() {
@@ -4610,34 +4662,54 @@ function saveDisplayName(val) {
 function saveUserData() {
   const uname = state.profile.username;
   if (!uname) return;
+  const savedAt = new Date().toISOString();
   const payload = {
     properties: state.properties,
     taxSettings: state.taxSettings,
     telegram: state.telegram,
-    savedAt: new Date().toISOString(),
+    savedAt,
   };
-  const json = JSON.stringify(payload);
+  // Full JSON (with base64 binary) -> IndexedDB (no size limit)
+  const fullJson = JSON.stringify(payload);
+  saveUserDataToDB(uname, fullJson);
+
+  // Light JSON (binary stripped) -> localStorage + Firebase (size-limited)
+  const lightJson = JSON.stringify(_lightPayload(payload));
   try {
-    localStorage.setItem('rentalUserData_' + uname, json);
+    localStorage.setItem('rentalUserData_' + uname, lightJson);
     const lbl = document.getElementById('last-saved-label');
     if (lbl) lbl.textContent = (_dirHandle ? '📁 ' : '') + '自動儲存 ' + new Date().toLocaleTimeString('zh-TW');
-  } catch(e) { /* quota exceeded */ }
-  // Sync to Firebase (fire-and-forget, no await)
-  fbPatch(`users/${uname}`, { userData: _fbS(json) });
-  saveToFile(json); // pass same JSON so file's savedAt matches localStorage
+  } catch(e) {
+    console.error('saveUserData: localStorage quota exceeded', e);
+    showToast('⚠️ localStorage 已滿，但資料已儲存到瀏覽器 IndexedDB，登出後仍可還原。', 6000);
+  }
+  fbPatch(`users/${uname}`, { userData: _fbS(lightJson) });
+  saveToFile(fullJson); // save full data (binary included) to local folder file
 }
 
-function loadUserData(uname) {
+async function loadUserData(uname) {
   if (!uname) return;
   state.properties = []; // clear before loading to avoid cross-account bleed
+  // Try IndexedDB first (full data with binary lease files)
+  const idbRaw = await loadUserDataFromDB(uname);
+  if (idbRaw) {
+    try {
+      const d = JSON.parse(idbRaw);
+      if (d.properties)  state.properties  = d.properties;
+      if (d.taxSettings) Object.assign(state.taxSettings, d.taxSettings);
+      if (d.telegram)    Object.assign(state.telegram, d.telegram);
+      return;
+    } catch(e) {}
+  }
+  // Fallback: localStorage (light data, no binary)
   const raw = localStorage.getItem('rentalUserData_' + uname);
   if (!raw) return;
   try {
     const d = JSON.parse(raw);
-    if (d.properties)   state.properties  = d.properties;
-    if (d.taxSettings)  Object.assign(state.taxSettings, d.taxSettings);
-    if (d.telegram)     Object.assign(state.telegram, d.telegram);
-  } catch(e) { /* corrupt data – ignore */ }
+    if (d.properties)  state.properties  = d.properties;
+    if (d.taxSettings) Object.assign(state.taxSettings, d.taxSettings);
+    if (d.telegram)    Object.assign(state.telegram, d.telegram);
+  } catch(e) {}
 }
 
 function getAllUsers() {
@@ -4657,6 +4729,7 @@ function unregisterUser(uname) {
   const users = getAllUsers().filter(u => u !== uname);
   localStorage.setItem('rentalAllUsers', JSON.stringify(users));
   localStorage.removeItem('rentalUserData_' + uname);
+  deleteUserDataFromDB(uname); // also remove from IndexedDB
 }
 
 // ============================================================
@@ -5041,7 +5114,7 @@ async function doSetup() {
     const rawData = _fbR(doc, 'userData');
     if (rawData) {
       localStorage.setItem('rentalUserData_' + uname, rawData);
-      loadUserData(uname);
+      await loadUserData(uname);
     }
     errEl.textContent = '';
     document.getElementById('login-overlay').style.display = 'none';
@@ -5086,7 +5159,7 @@ async function doLogin() {
   state.profile.username = uname;
   const ui = document.getElementById('username-input');
   if (ui) ui.value = uname;
-  loadUserData(uname); // restore local data first (instant)
+  await loadUserData(uname); // restore local data (IDB first, then localStorage)
   document.getElementById('login-overlay').style.display = 'none';
   renderView();
   showToast('✅ 登入成功');
@@ -5108,12 +5181,32 @@ async function doLogin() {
       const localTime = localRaw ? (JSON.parse(localRaw).savedAt || '') : '';
       const fbTime    = d.savedAt || '';
       if (fbTime > localTime) {
-        if (d.properties)  state.properties = d.properties;
+        // Firebase is newer — apply remote metadata but preserve local binary (lease files, photos)
+        const _idbBin = {};
+        (state.properties || []).forEach(p => { _idbBin[p.id] = p; });
+        if (d.properties) {
+          state.properties = d.properties.map(p => {
+            const loc = _idbBin[p.id] || {};
+            return {
+              ...p,
+              leaseFiles:  (p.leaseFiles  || []).map(f => { const l=(loc.leaseFiles||[]).find(x=>x.id===f.id); return l&&l.data?{...f,data:l.data}:f; }),
+              leaseDrafts: (p.leaseDrafts || []).map(f => { const l=(loc.leaseDrafts||[]).find(x=>x.id===f.id); return l&&l.data?{...f,data:l.data}:f; }),
+              maintenanceLogs: (p.maintenanceLogs || []).map(l => ({
+                ...l,
+                photos: (l.photos||[]).map(ph => {
+                  const ll=(loc.maintenanceLogs||[]).find(x=>x.id===l.id);
+                  const lph=ll?(ll.photos||[]).find(x=>x.id===ph.id):null;
+                  return lph&&lph.data?{...ph,data:lph.data}:ph;
+                }),
+              })),
+            };
+          });
+        }
         if (d.taxSettings) Object.assign(state.taxSettings, d.taxSettings);
         if (d.telegram)    Object.assign(state.telegram, d.telegram);
-        localStorage.setItem('rentalUserData_' + uname, raw);
+        saveUserData(); // persist merged result to IDB + localStorage
         renderView();
-        showToast('☁️ 已從雲端同步最新資料');
+        showToast('☁️ 已從雲端同步最新資料（本機租約文件已保留）');
       }
     } catch(e) {}
   });
