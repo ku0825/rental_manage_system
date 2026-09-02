@@ -731,9 +731,11 @@ async function fsStorageDelete(path) {
 // ============================================================
 const _FA_BASE    = 'https://identitytoolkit.googleapis.com/v1';
 const _FA_REFRESH = 'https://securetoken.googleapis.com/v1/token';
-let _fbIdToken = null, _fbTokenExpiry = 0, _fbRefreshToken = null;
+let _fbIdToken = null, _fbTokenExpiry = 0, _fbRefreshToken = null, _fbUid = null;
 
 function _faEmail(uname) { return uname.replace(/[^a-zA-Z0-9]/g, '_') + '@rentalapp.cc'; }
+// Returns the Firestore path for the current user — uid-based when available
+function _fbUserPath() { return _fbUid ? `users/${_fbUid}` : `users/${state.profile.username}`; }
 
 async function _faSignIn(uname, pwd) {
   const r = await fetch(`${_FA_BASE}/accounts:signInWithPassword?key=${_FB_KEY}`, {
@@ -757,7 +759,9 @@ function _faSetSession(data) {
   _fbIdToken      = data.idToken;
   _fbTokenExpiry  = Date.now() + (parseInt(data.expiresIn || 3600) - 60) * 1000;
   _fbRefreshToken = data.refreshToken;
+  _fbUid          = data.localId || _fbUid;
   localStorage.setItem('rentalFbRefresh', _fbRefreshToken);
+  if (_fbUid) localStorage.setItem('rentalFbUid', _fbUid);
 }
 
 async function _faDoRefresh() {
@@ -773,6 +777,7 @@ async function _faDoRefresh() {
     _fbIdToken      = d.id_token;
     _fbTokenExpiry  = Date.now() + (parseInt(d.expires_in || 3600) - 60) * 1000;
     _fbRefreshToken = d.refresh_token;
+    if (d.user_id) { _fbUid = d.user_id; localStorage.setItem('rentalFbUid', _fbUid); }
     localStorage.setItem('rentalFbRefresh', _fbRefreshToken);
     return _fbIdToken;
   } catch(e) { return null; }
@@ -793,12 +798,30 @@ async function _faAuth(uname, pwd) {
 }
 
 async function _faRestoreSession() {
+  _fbUid = localStorage.getItem('rentalFbUid') || null;
   await _faDoRefresh();
 }
 
+// One-time migration: copy Firestore data from users/{username} → users/{uid}
+async function _migrateToUid(uname) {
+  if (!_fbUid) return;
+  const uidDoc = await fbGet(`users/${_fbUid}`);
+  if (_fbR(uidDoc, 'userData')) return; // already at uid path, nothing to do
+  const oldDoc = await fbGet(`users/${uname}`);
+  if (!oldDoc) return;
+  const patch = {};
+  const ud = _fbR(oldDoc, 'userData'); if (ud) patch.userData = _fbS(ud);
+  const ph = _fbR(oldDoc, 'pwdHash');  if (ph) patch.pwdHash  = _fbS(ph);
+  if (Object.keys(patch).length) {
+    await fbPatch(`users/${_fbUid}`, patch);
+    showToast('🔒 資料已遷移至安全路徑', 3000);
+  }
+}
+
 function _faSignOut() {
-  _fbIdToken = null; _fbTokenExpiry = 0; _fbRefreshToken = null;
+  _fbIdToken = null; _fbTokenExpiry = 0; _fbRefreshToken = null; _fbUid = null;
   localStorage.removeItem('rentalFbRefresh');
+  localStorage.removeItem('rentalFbUid');
 }
 
 async function fbGet(docPath) {
@@ -3965,7 +3988,7 @@ async function handleLeaseFileUpload(propId, input) {
       reader.readAsDataURL(file);
     });
     const fileId = 'lf_' + Date.now() + Math.random().toString(36).slice(2,5);
-    const _ref = `users/${uname}/lf/${fileId}`;
+    const _ref = `users/${_fbUid || uname}/lf/${fileId}`;
     let uploadedRef = null, downloadToken = null;
     try {
       const meta = await fsStorageUpload(_ref, base64, file.type);
@@ -4073,7 +4096,7 @@ async function syncLeaseFilesToStorage() {
   for (const p of state.properties) {
     for (const f of (p.leaseFiles || [])) {
       if (!f.data || f.storageRef) continue;
-      const ref = `users/${uname}/lf/${f.id}`;
+      const ref = `users/${_fbUid || uname}/lf/${f.id}`;
       try {
         const meta = await fsStorageUpload(ref, f.data, f.type);
         f.storageRef = ref;
@@ -4084,7 +4107,7 @@ async function syncLeaseFilesToStorage() {
     }
     for (const f of (p.leaseDrafts || [])) {
       if (!f.data || f.storageRef) continue;
-      const ref = `users/${uname}/ld/${f.id}`;
+      const ref = `users/${_fbUid || uname}/ld/${f.id}`;
       try {
         const meta = await fsStorageUpload(ref, f.data, f.type);
         f.storageRef = ref;
@@ -4904,7 +4927,7 @@ function saveUserData() {
     console.error('saveUserData: localStorage quota exceeded', e);
     showToast('⚠️ localStorage 已滿，但資料已儲存到瀏覽器 IndexedDB，登出後仍可還原。', 6000);
   }
-  fbPatch(`users/${uname}`, { userData: _fbS(lightJson) });
+  fbPatch(_fbUserPath(), { userData: _fbS(lightJson) });
   saveToFile(fullJson); // save full data (binary included) to local folder file
 }
 
@@ -5318,21 +5341,41 @@ async function doSetup() {
   if (pwd !== pwd2)        { errEl.textContent = '⚠️ 兩次密碼不一致'; return; }
   const h = await hashPwd(pwd);
 
-  // Check Firebase: does this username already exist in the cloud?
-  errEl.textContent = '🔄 連線雲端驗證中…';
-  const doc = await fbGet(`users/${uname}`);
-  const remoteHash = _fbR(doc, 'pwdHash');
-  if (remoteHash) {
-    // Username exists in Firebase — verify password and sync data
-    if (h !== remoteHash) { errEl.textContent = '❌ 此帳號已存在於雲端，密碼不正確'; return; }
-    // Password matches — log in from new device and sync data from Firebase
+  // Firebase Auth is now the primary credential — try sign-in first
+  errEl.textContent = '🔐 驗證身份中…';
+  let isNewAccount = false;
+  try {
+    _faSetSession(await _faSignIn(uname, pwd));
+  } catch(e) {
+    const msg = e.message || '';
+    if (msg.includes('INVALID_PASSWORD') || msg.includes('INVALID_LOGIN_CREDENTIALS') || msg.includes('INVALID_EMAIL')) {
+      // Account exists but wrong password
+      errEl.textContent = '❌ 此帳號已存在於雲端，密碼不正確';
+      return;
+    }
+    // Account not found in Firebase Auth → create new
+    try {
+      _faSetSession(await _faSignUp(uname, pwd));
+      isNewAccount = true;
+    } catch(e2) {
+      errEl.textContent = '❌ 建立帳號失敗：' + (e2.message || '請確認網路連線');
+      return;
+    }
+  }
+
+  // Store local credentials
+  localStorage.setItem('rentalPwdHash_' + uname, h);
+  localStorage.setItem('rentalPwdHash', h);
+  localStorage.setItem('rentalUsername', uname);
+  state.profile.username = uname;
+  registerUser(uname);
+
+  if (!isNewAccount) {
+    // Existing account on new device — migrate & sync data
     errEl.textContent = '🔄 同步雲端資料中…';
-    localStorage.setItem('rentalPwdHash_' + uname, h);
-    localStorage.setItem('rentalPwdHash', h);
-    localStorage.setItem('rentalUsername', uname);
-    state.profile.username = uname;
-    registerUser(uname);
-    const rawData = _fbR(doc, 'userData');
+    await _migrateToUid(uname); // move data from users/{username} to users/{uid} if needed
+    const uidDoc = await fbGet(`users/${_fbUid}`);
+    const rawData = _fbR(uidDoc, 'userData');
     if (rawData) {
       localStorage.setItem('rentalUserData_' + uname, rawData);
       await loadUserData(uname);
@@ -5341,27 +5384,19 @@ async function doSetup() {
     document.getElementById('login-overlay').style.display = 'none';
     renderView();
     initFS();
-    _faAuth(uname, pwd); // Firebase Auth — background
     showToast('☁️ 已從雲端同步帳號資料，歡迎回來！');
-    return;
+  } else {
+    // Brand-new account
+    const ui = document.getElementById('username-input');
+    if (ui) ui.value = '';
+    saveUserData();
+    fbPatch(_fbUserPath(), { pwdHash: _fbS(h) });
+    errEl.textContent = '';
+    document.getElementById('login-overlay').style.display = 'none';
+    renderView();
+    initFS();
+    showToast('✅ 帳號建立成功，歡迎使用！');
   }
-
-  // New account — create locally and push to Firebase
-  localStorage.setItem('rentalPwdHash_' + uname, h);
-  localStorage.setItem('rentalPwdHash', h);
-  localStorage.setItem('rentalUsername', uname);
-  state.profile.username = uname;
-  const ui = document.getElementById('username-input');
-  if (ui) ui.value = state.profile.displayName || '';
-  registerUser(uname);
-  saveUserData(); // persist initial data (also syncs userData to Firebase)
-  fbPatch(`users/${uname}`, { pwdHash: _fbS(h) }); // save hash to Firebase
-  errEl.textContent = '';
-  document.getElementById('login-overlay').style.display = 'none';
-  renderView();
-  initFS();
-  _faAuth(uname, pwd); // Firebase Auth — background
-  showToast('✅ 帳號建立成功，歡迎使用！');
 }
 
 async function doLogin() {
@@ -5387,15 +5422,17 @@ async function doLogin() {
   renderView();
   showToast('✅ 登入成功');
   initFS();
-  _faAuth(uname, pwd); // Firebase Auth — background, non-blocking
+  // Firebase Auth — now awaited so _fbUid is ready for uid-based Firestore paths
+  await _faAuth(uname, pwd);
+  await _migrateToUid(uname); // migrate once if data still at username path
   // Background: sync with Firebase (upload if empty, download if newer)
-  fbGet(`users/${uname}`).then(doc => {
+  fbGet(_fbUserPath()).then(doc => {
     const raw = _fbR(doc, 'userData');
     const localRaw = localStorage.getItem('rentalUserData_' + uname);
     if (!raw) {
       // Firebase is empty → upload local data and hash now
       if (localRaw) {
-        fbPatch(`users/${uname}`, { pwdHash: _fbS(storedHash), userData: _fbS(localRaw) });
+        fbPatch(_fbUserPath(), { pwdHash: _fbS(storedHash), userData: _fbS(localRaw) });
         showToast('☁️ 資料已首次同步至雲端');
       }
       return;
