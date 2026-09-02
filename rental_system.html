@@ -690,8 +690,15 @@ async function fsStorageUpload(path, base64data, mimeType) {
 }
 // Firebase Storage: download → returns base64 string (no prefix)
 async function fsStorageDownload(path) {
-  const r = await fetch(`${_FS_BASE}/${encodeURIComponent(path)}?alt=media`);
-  if (!r.ok) throw new Error('Storage download ' + r.status);
+  const url = `${_FS_BASE}/${encodeURIComponent(path)}?alt=media`;
+  let r;
+  try { r = await fetch(url); }
+  catch(e) { throw new Error('網路錯誤：' + e.message); }
+  if (!r.ok) {
+    let errBody = '';
+    try { const j = await r.json(); errBody = j.error?.message || ''; } catch(_) {}
+    throw new Error(`HTTP ${r.status}${errBody ? ' – ' + errBody : ''}`);
+  }
   const blob = await r.blob();
   return new Promise((res, rej) => {
     const reader = new FileReader();
@@ -3868,11 +3875,13 @@ async function handleLeaseFileUpload(propId, input) {
       reader.readAsDataURL(file);
     });
     const fileId = 'lf_' + Date.now() + Math.random().toString(36).slice(2,5);
-    const storageRef = `users/${uname}/lf/${fileId}`;
-    try { await fsStorageUpload(storageRef, base64, file.type); } catch(e) { console.warn('Storage upload failed', e); }
+    const _ref = `users/${uname}/lf/${fileId}`;
+    let uploadedRef = null;
+    try { await fsStorageUpload(_ref, base64, file.type); uploadedRef = _ref; }
+    catch(e) { console.warn('Storage upload failed', e); }
     p.leaseFiles.push({
       id: fileId, name: file.name, type: file.type, size: file.size,
-      data: base64, storageRef,
+      data: base64, storageRef: uploadedRef,
       uploadedAt: new Date().toISOString().slice(0,10),
       status: 'active', archivedAt: null, notes: '',
     });
@@ -3891,9 +3900,9 @@ async function downloadLeaseFile(propId, fileId) {
   if (!data && f.storageRef) {
     showToast('⬇️ 從雲端下載中…');
     try { data = await fsStorageDownload(f.storageRef); f.data = data; saveUserData(); }
-    catch(e) { showToast('❌ 下載失敗，請確認網路連線'); return; }
+    catch(e) { showToast('❌ 下載失敗：' + (e.message || '請確認網路連線')); return; }
   }
-  if (!data) { showToast('❌ 找不到檔案（可能已從雲端刪除）'); return; }
+  if (!data) { showToast('❌ 找不到檔案（請在原電腦點「☁️ 同步到雲端」後再試）'); return; }
   const blob = b64toBlob(data, f.type || 'application/octet-stream');
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -4157,9 +4166,9 @@ async function downloadLeaseDraft(propId, fileId) {
   if (!data && f.storageRef) {
     showToast('⬇️ 從雲端下載中…');
     try { data = await fsStorageDownload(f.storageRef); f.data = data; saveUserData(); }
-    catch(e) { showToast('❌ 下載失敗，請確認網路連線'); return; }
+    catch(e) { showToast('❌ 下載失敗：' + (e.message || '請確認網路連線')); return; }
   }
-  if (!data) { showToast('❌ 找不到檔案（可能已從雲端刪除）'); return; }
+  if (!data) { showToast('❌ 找不到檔案（請在原電腦點「☁️ 同步到雲端」後再試）'); return; }
   const blob = b64toBlob(data, f.type || 'application/octet-stream');
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
