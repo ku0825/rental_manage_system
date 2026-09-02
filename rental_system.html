@@ -594,9 +594,12 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
       <button class="modal-close" onclick="closeLeaseModal()">✕</button>
     </div>
     <div class="modal-body" id="lease-modal-body" style="padding:20px"></div>
-    <div class="modal-foot" style="display:flex;justify-content:space-between;align-items:center">
+    <div class="modal-foot" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
       <span id="lease-storage-info" style="font-size:11px;color:#aaa"></span>
-      <button class="btn-ghost" onclick="closeLeaseModal()">關閉</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-ghost" id="lease-sync-btn" onclick="syncLeaseFilesToStorage()" style="font-size:12px" title="將本機現有租約文件補傳至 Firebase Storage，讓其他裝置也能下載">☁️ 同步到雲端</button>
+        <button class="btn-ghost" onclick="closeLeaseModal()">關閉</button>
+      </div>
     </div>
   </div>
 </div>
@@ -3935,6 +3938,64 @@ function openLeaseModal(propId) {
   renderLeaseModalBody(propId);
   updateLeaseStorageInfo();
   document.getElementById('lease-modal').style.display = 'flex';
+  // Show sync button only when there are files missing storageRef but with local data
+  _updateSyncBtn();
+}
+
+function _updateSyncBtn() {
+  const btn = document.getElementById('lease-sync-btn');
+  if (!btn) return;
+  const needSync = state.properties.some(p =>
+    [...(p.leaseFiles||[]), ...(p.leaseDrafts||[])].some(f => f.data && !f.storageRef)
+  );
+  btn.style.display = needSync ? '' : 'none';
+}
+
+// Upload all local files that lack storageRef to Firebase Storage
+async function syncLeaseFilesToStorage() {
+  const uname = state.profile.username;
+  const btn = document.getElementById('lease-sync-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '☁️ 同步中…'; }
+
+  let total = 0, done = 0, failed = 0;
+  for (const p of state.properties) {
+    for (const f of (p.leaseFiles || [])) {
+      if (f.data && !f.storageRef) total++;
+    }
+    for (const f of (p.leaseDrafts || [])) {
+      if (f.data && !f.storageRef) total++;
+    }
+  }
+  if (!total) { showToast('✅ 所有文件已在雲端，無需同步'); if (btn) { btn.disabled = false; btn.textContent = '☁️ 同步到雲端'; } return; }
+
+  for (const p of state.properties) {
+    for (const f of (p.leaseFiles || [])) {
+      if (!f.data || f.storageRef) continue;
+      const ref = `users/${uname}/lf/${f.id}`;
+      try {
+        await fsStorageUpload(ref, f.data, f.type);
+        f.storageRef = ref;
+        done++;
+      } catch(e) { failed++; }
+      if (btn) btn.textContent = `☁️ 同步中 ${done+failed}/${total}`;
+    }
+    for (const f of (p.leaseDrafts || [])) {
+      if (!f.data || f.storageRef) continue;
+      const ref = `users/${uname}/ld/${f.id}`;
+      try {
+        await fsStorageUpload(ref, f.data, f.type);
+        f.storageRef = ref;
+        done++;
+      } catch(e) { failed++; }
+      if (btn) btn.textContent = `☁️ 同步中 ${done+failed}/${total}`;
+    }
+  }
+
+  saveUserData();
+  _updateSyncBtn();
+  if (btn) { btn.disabled = false; btn.textContent = '☁️ 同步到雲端'; }
+  if (failed) showToast(`⚠️ 完成：${done} 個成功，${failed} 個失敗`);
+  else showToast(`✅ 已同步 ${done} 個文件到雲端，其他裝置現在可以下載`);
 }
 
 function closeLeaseModal() { document.getElementById('lease-modal').style.display = 'none'; }
