@@ -682,8 +682,14 @@ async function fsStorageUpload(path, base64data, mimeType) {
   const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   const blob = new Blob([arr], { type: mimeType || 'application/octet-stream' });
+  const token = await _faToken();
   const r = await fetch(`${_FS_BASE}?uploadType=media&name=${encodeURIComponent(path)}`, {
-    method: 'POST', headers: { 'Content-Type': mimeType || 'application/octet-stream' }, body: blob,
+    method: 'POST',
+    headers: {
+      'Content-Type': mimeType || 'application/octet-stream',
+      ...(token ? { Authorization: 'Bearer ' + token } : {}),
+    },
+    body: blob,
   });
   if (!r.ok) throw new Error('Storage upload ' + r.status);
   return r.json();
@@ -712,13 +718,94 @@ async function fsStorageDownload(path, token) {
 // Firebase Storage: delete (fire-and-forget OK)
 async function fsStorageDelete(path) {
   try {
-    await fetch(`${_FS_BASE}/${encodeURIComponent(path)}`, { method: 'DELETE' });
+    const token = await _faToken();
+    await fetch(`${_FS_BASE}/${encodeURIComponent(path)}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: 'Bearer ' + token } : {},
+    });
   } catch(e) {}
+}
+
+// ============================================================
+// FIREBASE AUTH (REST API — no SDK needed)
+// ============================================================
+const _FA_BASE    = 'https://identitytoolkit.googleapis.com/v1';
+const _FA_REFRESH = 'https://securetoken.googleapis.com/v1/token';
+let _fbIdToken = null, _fbTokenExpiry = 0, _fbRefreshToken = null;
+
+function _faEmail(uname) { return uname.replace(/[^a-zA-Z0-9]/g, '_') + '@rentalapp.cc'; }
+
+async function _faSignIn(uname, pwd) {
+  const r = await fetch(`${_FA_BASE}/accounts:signInWithPassword?key=${_FB_KEY}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: _faEmail(uname), password: pwd, returnSecureToken: true }),
+  });
+  if (!r.ok) { const e = await r.json(); throw new Error(e.error?.message || 'signin failed'); }
+  return r.json();
+}
+
+async function _faSignUp(uname, pwd) {
+  const r = await fetch(`${_FA_BASE}/accounts:signUp?key=${_FB_KEY}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: _faEmail(uname), password: pwd, returnSecureToken: true }),
+  });
+  if (!r.ok) { const e = await r.json(); throw new Error(e.error?.message || 'signup failed'); }
+  return r.json();
+}
+
+function _faSetSession(data) {
+  _fbIdToken      = data.idToken;
+  _fbTokenExpiry  = Date.now() + (parseInt(data.expiresIn || 3600) - 60) * 1000;
+  _fbRefreshToken = data.refreshToken;
+  localStorage.setItem('rentalFbRefresh', _fbRefreshToken);
+}
+
+async function _faDoRefresh() {
+  const refresh = _fbRefreshToken || localStorage.getItem('rentalFbRefresh');
+  if (!refresh) return null;
+  try {
+    const r = await fetch(`${_FA_REFRESH}?key=${_FB_KEY}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refresh)}`,
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    _fbIdToken      = d.id_token;
+    _fbTokenExpiry  = Date.now() + (parseInt(d.expires_in || 3600) - 60) * 1000;
+    _fbRefreshToken = d.refresh_token;
+    localStorage.setItem('rentalFbRefresh', _fbRefreshToken);
+    return _fbIdToken;
+  } catch(e) { return null; }
+}
+
+async function _faToken() {
+  if (_fbIdToken && Date.now() < _fbTokenExpiry) return _fbIdToken;
+  return _faDoRefresh();
+}
+
+// Sign in (or create) Firebase Auth account after local auth succeeds — background, non-blocking
+async function _faAuth(uname, pwd) {
+  try { _faSetSession(await _faSignIn(uname, pwd)); }
+  catch(e) {
+    try { _faSetSession(await _faSignUp(uname, pwd)); }
+    catch(e2) { console.warn('Firebase Auth:', e2.message); }
+  }
+}
+
+async function _faRestoreSession() {
+  await _faDoRefresh();
+}
+
+function _faSignOut() {
+  _fbIdToken = null; _fbTokenExpiry = 0; _fbRefreshToken = null;
+  localStorage.removeItem('rentalFbRefresh');
 }
 
 async function fbGet(docPath) {
   try {
-    const r = await fetch(`${_FB_BASE}/${docPath}?key=${_FB_KEY}`);
+    const token = await _faToken();
+    const headers = token ? { Authorization: 'Bearer ' + token } : {};
+    const r = await fetch(`${_FB_BASE}/${docPath}?key=${_FB_KEY}`, { headers });
     if (r.status === 404) return null;
     return r.ok ? await r.json() : null;
   } catch(e) { return null; }
@@ -726,10 +813,11 @@ async function fbGet(docPath) {
 
 async function fbPatch(docPath, fields) {
   try {
+    const token = await _faToken();
     const mask = Object.keys(fields).map(f => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
     const r = await fetch(`${_FB_BASE}/${docPath}?${mask}&key=${_FB_KEY}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
       body: JSON.stringify({ fields })
     });
     return r.ok;
@@ -5253,6 +5341,7 @@ async function doSetup() {
     document.getElementById('login-overlay').style.display = 'none';
     renderView();
     initFS();
+    _faAuth(uname, pwd); // Firebase Auth — background
     showToast('☁️ 已從雲端同步帳號資料，歡迎回來！');
     return;
   }
@@ -5271,6 +5360,7 @@ async function doSetup() {
   document.getElementById('login-overlay').style.display = 'none';
   renderView();
   initFS();
+  _faAuth(uname, pwd); // Firebase Auth — background
   showToast('✅ 帳號建立成功，歡迎使用！');
 }
 
@@ -5297,6 +5387,7 @@ async function doLogin() {
   renderView();
   showToast('✅ 登入成功');
   initFS();
+  _faAuth(uname, pwd); // Firebase Auth — background, non-blocking
   // Background: sync with Firebase (upload if empty, download if newer)
   fbGet(`users/${uname}`).then(doc => {
     const raw = _fbR(doc, 'userData');
@@ -5379,6 +5470,7 @@ function startNewAccountSetup() {
 }
 
 function doLogout() {
+  _faSignOut();  // clear Firebase Auth token
   resetState(); // clear all user data from memory before showing login
   const overlay = document.getElementById('login-overlay');
   document.getElementById('login-setup-section').style.display = 'none';
@@ -5435,6 +5527,7 @@ async function changePassword() {
 // ============================================================
 // INIT
 // ============================================================
+_faRestoreSession(); // restore Firebase Auth token from localStorage (background)
 initLoginScreen();
 renderView();
 </script>
