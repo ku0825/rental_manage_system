@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+<script src="https://www.google.com/recaptcha/api.js?render=6Ld3P6YtAAAAAOWEvRzRAdcWJlMuxuIIsaYcECMb" async defer></script>
 <style>
 :root {
   --primary: #1b3a6e; --primary-light: #2d5a9e;
@@ -676,20 +677,54 @@ const _FB_BASE     = `https://firestore.googleapis.com/v1/projects/${_FB_PROJECT
 const _FS_BUCKET   = `${_FB_PROJECT}.firebasestorage.app`;
 const _FS_BASE     = `https://firebasestorage.googleapis.com/v0/b/${_FS_BUCKET}/o`;
 
+// ============================================================
+// FIREBASE APP CHECK (reCAPTCHA v3 — no SDK needed)
+// ============================================================
+const _AC_APP_ID   = '1:102869565664:web:954030c95f1b9561d09085';
+const _AC_SITE_KEY = '6Ld3P6YtAAAAAOWEvRzRAdcWJlMuxuIIsaYcECMb';
+const _AC_BASE     = `https://firebaseappcheck.googleapis.com/v1/projects/${_FB_PROJECT}/apps/${_AC_APP_ID}`;
+let _acToken = null, _acTokenExpiry = 0;
+
+async function _acGetToken() {
+  if (_acToken && Date.now() < _acTokenExpiry) return _acToken;
+  try {
+    const rcToken = await new Promise((res, rej) => {
+      if (typeof grecaptcha === 'undefined') { rej(new Error('reCAPTCHA not loaded')); return; }
+      grecaptcha.ready(() => grecaptcha.execute(_AC_SITE_KEY, { action: 'firebase' }).then(res).catch(rej));
+    });
+    const r = await fetch(`${_AC_BASE}:exchangeReCaptchaV3Token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recaptchaV3Token: rcToken }),
+    });
+    if (!r.ok) throw new Error('App Check ' + r.status);
+    const d = await r.json();
+    _acToken = d.token;
+    const ttl = parseInt((d.ttl || '3600s').replace('s', '')) || 3600;
+    _acTokenExpiry = Date.now() + (ttl - 60) * 1000;
+    return _acToken;
+  } catch(e) { console.warn('App Check token failed:', e.message); return null; }
+}
+
+// Build headers with both Firebase Auth token and App Check token
+async function _fbHeaders(extra = {}) {
+  const [authToken, acToken] = await Promise.all([_faToken(), _acGetToken()]);
+  return {
+    ...extra,
+    ...(authToken ? { Authorization: 'Bearer ' + authToken } : {}),
+    ...(acToken   ? { 'X-Firebase-AppCheck': acToken }       : {}),
+  };
+}
+
 // Firebase Storage: upload base64 → returns metadata JSON
 async function fsStorageUpload(path, base64data, mimeType) {
   const bin = atob(base64data);
   const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   const blob = new Blob([arr], { type: mimeType || 'application/octet-stream' });
-  const token = await _faToken();
+  const headers = await _fbHeaders({ 'Content-Type': mimeType || 'application/octet-stream' });
   const r = await fetch(`${_FS_BASE}?uploadType=media&name=${encodeURIComponent(path)}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': mimeType || 'application/octet-stream',
-      ...(token ? { Authorization: 'Bearer ' + token } : {}),
-    },
-    body: blob,
+    method: 'POST', headers, body: blob,
   });
   if (!r.ok) throw new Error('Storage upload ' + r.status);
   return r.json();
@@ -699,8 +734,9 @@ async function fsStorageUpload(path, base64data, mimeType) {
 async function fsStorageDownload(path, token) {
   let url = `${_FS_BASE}/${encodeURIComponent(path)}?alt=media`;
   if (token) url += '&token=' + encodeURIComponent(token);
+  const headers = token ? {} : await _fbHeaders(); // use auth headers only when no downloadToken
   let r;
-  try { r = await fetch(url); }
+  try { r = await fetch(url, token ? {} : { headers }); }
   catch(e) { throw new Error('failed to fetch: ' + e.message); }
   if (!r.ok) {
     let errBody = '';
@@ -718,11 +754,8 @@ async function fsStorageDownload(path, token) {
 // Firebase Storage: delete (fire-and-forget OK)
 async function fsStorageDelete(path) {
   try {
-    const token = await _faToken();
-    await fetch(`${_FS_BASE}/${encodeURIComponent(path)}`, {
-      method: 'DELETE',
-      headers: token ? { Authorization: 'Bearer ' + token } : {},
-    });
+    const headers = await _fbHeaders();
+    await fetch(`${_FS_BASE}/${encodeURIComponent(path)}`, { method: 'DELETE', headers });
   } catch(e) {}
 }
 
@@ -826,8 +859,7 @@ function _faSignOut() {
 
 async function fbGet(docPath) {
   try {
-    const token = await _faToken();
-    const headers = token ? { Authorization: 'Bearer ' + token } : {};
+    const headers = await _fbHeaders();
     const r = await fetch(`${_FB_BASE}/${docPath}?key=${_FB_KEY}`, { headers });
     if (r.status === 404) return null;
     return r.ok ? await r.json() : null;
@@ -836,12 +868,10 @@ async function fbGet(docPath) {
 
 async function fbPatch(docPath, fields) {
   try {
-    const token = await _faToken();
+    const headers = await _fbHeaders({ 'Content-Type': 'application/json' });
     const mask = Object.keys(fields).map(f => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
     const r = await fetch(`${_FB_BASE}/${docPath}?${mask}&key=${_FB_KEY}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
-      body: JSON.stringify({ fields })
+      method: 'PATCH', headers, body: JSON.stringify({ fields })
     });
     return r.ok;
   } catch(e) { return false; }
@@ -852,7 +882,8 @@ const _fbR = (doc, f) => doc?.fields?.[f]?.stringValue ?? null;
 
 async function fbDelete(docPath) {
   try {
-    const r = await fetch(`${_FB_BASE}/${docPath}?key=${_FB_KEY}`, { method: 'DELETE' });
+    const headers = await _fbHeaders();
+    const r = await fetch(`${_FB_BASE}/${docPath}?key=${_FB_KEY}`, { method: 'DELETE', headers });
     return r.ok;
   } catch(e) { return false; }
 }
