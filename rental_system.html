@@ -4967,7 +4967,7 @@ function saveUserData() {
     console.error('saveUserData: localStorage quota exceeded', e);
     showToast('⚠️ localStorage 已滿，但資料已儲存到瀏覽器 IndexedDB，登出後仍可還原。', 6000);
   }
-  fbPatch(_fbUserPath(), { userData: _fbS(lightJson) });
+  fbPatch(`users/${uname}`, { userData: _fbS(lightJson) });
   saveToFile(fullJson); // save full data (binary included) to local folder file
 }
 
@@ -5415,11 +5415,21 @@ async function doSetup() {
   registerUser(uname);
 
   if (!isNewAccount) {
-    // Existing account on new device — migrate & sync data
+    // Existing account on new device — sync data from Firestore
     errEl.textContent = '🔄 同步雲端資料中…';
-    await _migrateToUid(uname); // move data from users/{username} to users/{uid} if needed
-    const uidDoc = await fbGet(`users/${_fbUid}`);
-    const rawData = _fbR(uidDoc, 'userData');
+    // Try username path first (primary), then uid path as fallback (for previously migrated accounts)
+    let rawData = null;
+    const unameDoc = await fbGet(`users/${uname}`);
+    rawData = _fbR(unameDoc, 'userData');
+    if (!rawData && _fbUid) {
+      const uidDoc = await fbGet(`users/${_fbUid}`);
+      rawData = _fbR(uidDoc, 'userData');
+      // If found at uid path, re-save to username path for consistency
+      if (rawData) {
+        fbPatch(`users/${uname}`, { pwdHash: _fbS(h), userData: _fbS(rawData) });
+        showToast('🔄 資料路徑已更新');
+      }
+    }
     if (rawData) {
       localStorage.setItem('rentalUserData_' + uname, rawData);
       await loadUserData(uname);
@@ -5434,7 +5444,7 @@ async function doSetup() {
     const ui = document.getElementById('username-input');
     if (ui) ui.value = '';
     saveUserData();
-    fbPatch(_fbUserPath(), { pwdHash: _fbS(h) });
+    fbPatch(`users/${uname}`, { pwdHash: _fbS(h) });
     errEl.textContent = '';
     document.getElementById('login-overlay').style.display = 'none';
     renderView();
@@ -5466,17 +5476,16 @@ async function doLogin() {
   renderView();
   showToast('✅ 登入成功');
   initFS();
-  // Firebase Auth — now awaited so _fbUid is ready for uid-based Firestore paths
-  await _faAuth(uname, pwd);
-  await _migrateToUid(uname); // migrate once if data still at username path
+  // Firebase Auth (background — local data already loaded)
+  _faAuth(uname, pwd).catch(e => console.warn('Firebase Auth error:', e.message));
   // Background: sync with Firebase (upload if empty, download if newer)
-  fbGet(_fbUserPath()).then(doc => {
+  fbGet(`users/${uname}`).then(doc => {
     const raw = _fbR(doc, 'userData');
     const localRaw = localStorage.getItem('rentalUserData_' + uname);
     if (!raw) {
       // Firebase is empty → upload local data and hash now
       if (localRaw) {
-        fbPatch(_fbUserPath(), { pwdHash: _fbS(storedHash), userData: _fbS(localRaw) });
+        fbPatch(`users/${uname}`, { pwdHash: _fbS(storedHash), userData: _fbS(localRaw) });
         showToast('☁️ 資料已首次同步至雲端');
       }
       return;
