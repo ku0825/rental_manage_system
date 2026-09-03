@@ -5388,17 +5388,21 @@ async function doSetup() {
     _faSetSession(await _faSignIn(uname, pwd));
   } catch(e) {
     const msg = e.message || '';
-    if (msg.includes('INVALID_PASSWORD') || msg.includes('INVALID_LOGIN_CREDENTIALS') || msg.includes('INVALID_EMAIL')) {
-      // Account exists but wrong password
-      errEl.textContent = '❌ 此帳號已存在於雲端，密碼不正確';
-      return;
+    if (msg.includes('INVALID_PASSWORD')) {
+      errEl.textContent = '❌ 此帳號已存在於雲端，密碼不正確'; return;
     }
-    // Account not found in Firebase Auth → create new
+    // INVALID_LOGIN_CREDENTIALS now covers both wrong email AND wrong password in Firebase
+    // → always attempt signUp; if account truly exists, signUp returns EMAIL_EXISTS
     try {
       _faSetSession(await _faSignUp(uname, pwd));
       isNewAccount = true;
     } catch(e2) {
-      errEl.textContent = '❌ 建立帳號失敗：' + (e2.message || '請確認網路連線');
+      const m2 = e2.message || '';
+      if (m2.includes('EMAIL_EXISTS')) {
+        errEl.textContent = '❌ 此帳號已存在於雲端，密碼不正確';
+      } else {
+        errEl.textContent = '❌ 建立帳號失敗：' + m2;
+      }
       return;
     }
   }
