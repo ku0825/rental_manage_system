@@ -766,7 +766,16 @@ const _FA_BASE    = 'https://identitytoolkit.googleapis.com/v1';
 const _FA_REFRESH = 'https://securetoken.googleapis.com/v1/token';
 let _fbIdToken = null, _fbTokenExpiry = 0, _fbRefreshToken = null, _fbUid = null;
 
-function _faEmail(uname) { return uname.replace(/[^a-zA-Z0-9]/g, '_') + '@rentalapp.cc'; }
+function _faEmail(uname) {
+  // base64url encode to avoid collisions with non-ASCII usernames (e.g. Chinese)
+  try {
+    const b64 = btoa(unescape(encodeURIComponent(uname)))
+      .replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+    return b64 + '@rentalapp.cc';
+  } catch(e) {
+    return uname.replace(/[^a-zA-Z0-9]/g,'_') + '@rentalapp.cc';
+  }
+}
 // Returns the Firestore path for the current user — uid-based when available
 function _fbUserPath() { return _fbUid ? `users/${_fbUid}` : `users/${state.profile.username}`; }
 
