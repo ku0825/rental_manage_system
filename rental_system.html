@@ -9,7 +9,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
-<script src="https://www.google.com/recaptcha/api.js?render=6Ld3P6YtAAAAAOWEvRzRAdcWJlMuxuIIsaYcECMb" async defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check-compat.js"></script>
 <style>
 :root {
   --primary: #1b3a6e; --primary-light: #2d5a9e;
@@ -682,26 +683,26 @@ const _FS_BASE     = `https://firebasestorage.googleapis.com/v0/b/${_FS_BUCKET}/
 // ============================================================
 const _AC_APP_ID   = '1:102869565664:web:954030c95f1b9561d09085';
 const _AC_SITE_KEY = '6Ld3P6YtAAAAAOWEvRzRAdcWJlMuxuIIsaYcECMb';
-const _AC_BASE     = `https://firebaseappcheck.googleapis.com/v1/projects/${_FB_PROJECT}/apps/${_AC_APP_ID}`;
 let _acToken = null, _acTokenExpiry = 0;
+let _fbSDKApp = null, _fbSDKAppCheck = null;
+
+function _initFbSDK() {
+  if (_fbSDKApp) return;
+  try {
+    _fbSDKApp = firebase.initializeApp({ apiKey: _FB_KEY, projectId: _FB_PROJECT, appId: _AC_APP_ID });
+    _fbSDKAppCheck = firebase.appCheck();
+    _fbSDKAppCheck.activate(new firebase.appCheck.ReCaptchaV3Provider(_AC_SITE_KEY), true);
+  } catch(e) { console.warn('Firebase SDK init:', e.message); }
+}
 
 async function _acGetToken() {
   if (_acToken && Date.now() < _acTokenExpiry) return _acToken;
   try {
-    const rcToken = await new Promise((res, rej) => {
-      if (typeof grecaptcha === 'undefined') { rej(new Error('reCAPTCHA not loaded')); return; }
-      grecaptcha.ready(() => grecaptcha.execute(_AC_SITE_KEY, { action: 'firebase' }).then(res).catch(rej));
-    });
-    const r = await fetch(`${_AC_BASE}:exchangeReCaptchaV3Token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recaptchaV3Token: rcToken }),
-    });
-    if (!r.ok) throw new Error('App Check ' + r.status);
-    const d = await r.json();
-    _acToken = d.token;
-    const ttl = parseInt((d.ttl || '3600s').replace('s', '')) || 3600;
-    _acTokenExpiry = Date.now() + (ttl - 60) * 1000;
+    _initFbSDK();
+    if (!_fbSDKAppCheck) return null;
+    const result = await _fbSDKAppCheck.getToken(false);
+    _acToken = result.token;
+    _acTokenExpiry = Date.now() + 3500000;
     return _acToken;
   } catch(e) { console.warn('App Check token failed:', e.message); return null; }
 }
