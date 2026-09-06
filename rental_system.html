@@ -2525,32 +2525,7 @@ function renderSettings() {
     </div>
   </div>
 
-  <div class="card" style="margin-top:18px">
-    <div class="card-hdr">🗺️ Google Maps API Key（地圖 / 街景嵌入用）</div>
-    <div class="card-body">
-      <div class="ibox ibox-blue" style="font-size:12px;margin-bottom:14px">
-        設定後，「地圖 / 街景」頁可直接嵌入 Google 街景視圖，支援一般地圖與街景切換。<br>
-        <strong>取得方式：</strong>前往 <strong>console.cloud.google.com</strong> → APIs &amp; Services → Credentials → Create API Key<br>
-        <strong>需啟用 API：</strong>Maps Embed API（免費配額：每月 28,500 次嵌入，個人使用完全免費）
-      </div>
-      <div class="fg">
-        <label>Google Maps API Key</label>
-        <div style="display:flex;gap:6px;align-items:center">
-          <input type="password" id="gm-api-key"
-            value="${localStorage.getItem('rentalGoogleMapsKey')||''}"
-            placeholder="AIzaSy..."
-            style="font-family:monospace;font-size:12px;flex:1">
-          <button class="btn-ghost btn-sm" style="white-space:nowrap;padding:4px 10px"
-            onclick="(()=>{const e=document.getElementById('gm-api-key');e.type=e.type==='password'?'text':'password'})()">👁 顯示</button>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:center;margin-top:10px">
-        <button class="btn-pri" onclick="saveGMapsSettings()">💾 儲存設定</button>
-        <button class="btn-ghost" onclick="clearGMapsSettings()">🗑️ 清除 Key</button>
-        <span id="gm-save-msg" style="font-size:13px"></span>
-      </div>
-    </div>
-  </div>`;
+  `;
 }
 function updateTS(k, v) { state.taxSettings[k] = v; if(state.view==='tax'||state.view==='dashboard')renderView(); saveUserData(); }
 
@@ -3150,6 +3125,19 @@ function clearAISettings() {
   if (el) el.value = '';
   const msg = document.getElementById('ai-save-msg');
   if (msg) { msg.textContent = '🗑️ 已清除'; setTimeout(() => { if(msg) msg.textContent = ''; }, 2500); }
+}
+
+function adminSaveGMapsKey() {
+  const key = (document.getElementById('admin-gm-api-key').value||'').trim();
+  if (key) { localStorage.setItem('rentalGoogleMapsKey', key); document.getElementById('admin-gm-msg').textContent = '✅ 已儲存'; }
+  else { document.getElementById('admin-gm-msg').textContent = '⚠️ 請輸入 Key'; }
+  setTimeout(() => { const el = document.getElementById('admin-gm-msg'); if(el) el.textContent=''; }, 2000);
+}
+function adminClearGMapsKey() {
+  localStorage.removeItem('rentalGoogleMapsKey');
+  const el = document.getElementById('admin-gm-api-key'); if(el) el.value='';
+  const msg = document.getElementById('admin-gm-msg'); if(msg) msg.textContent='🗑️ 已清除';
+  setTimeout(() => { const e = document.getElementById('admin-gm-msg'); if(e) e.textContent=''; }, 2000);
 }
 
 function saveGMapsSettings() {
@@ -5175,6 +5163,24 @@ function renderAdminBody() {
     </div>
     <div id="fb-admin-section">
       <div style="color:rgba(255,255,255,.3);padding:12px 4px;font-size:13px">載入中…</div>
+    </div>
+
+    <div class="admin-section" style="margin-top:24px">🗺️ Google Maps API Key</div>
+    <div style="margin-bottom:16px">
+      <div style="color:rgba(255,200,200,.6);font-size:11px;margin-bottom:8px">設定後，地圖頁可嵌入 Google 街景。需在 Google Cloud Console 啟用 Maps Embed API。</div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+        <input type="password" id="admin-gm-api-key"
+          value="${localStorage.getItem('rentalGoogleMapsKey')||''}"
+          placeholder="AIzaSy..."
+          style="background:rgba(255,255,255,.07);border:1px solid rgba(255,80,80,.25);border-radius:8px;padding:8px 12px;color:#fff;font-family:monospace;font-size:12px;flex:1">
+        <button class="admin-btn" style="padding:8px 12px;font-size:12px"
+          onclick="(()=>{const e=document.getElementById('admin-gm-api-key');e.type=e.type==='password'?'text':'password'})()">👁</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="admin-btn admin-btn-reset" style="padding:8px 14px;font-size:12px" onclick="adminSaveGMapsKey()">💾 儲存</button>
+        <button class="admin-btn" style="padding:8px 14px;font-size:12px;background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4)" onclick="adminClearGMapsKey()">🗑️ 清除</button>
+        <span id="admin-gm-msg" style="font-size:12px;color:#5ddb94"></span>
+      </div>
     </div>
 
     <div class="admin-section" style="margin-top:24px">管理員密碼</div>
