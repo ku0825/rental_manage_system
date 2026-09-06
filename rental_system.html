@@ -691,7 +691,7 @@ function _initFbSDK() {
   try {
     _fbSDKApp = firebase.initializeApp({ apiKey: _FB_KEY, projectId: _FB_PROJECT, appId: _AC_APP_ID });
     _fbSDKAppCheck = firebase.appCheck();
-    _fbSDKAppCheck.activate(new firebase.appCheck.ReCaptchaV3Provider(_AC_SITE_KEY), true);
+    _fbSDKAppCheck.activate(new firebase.appCheck.ReCaptchaEnterpriseProvider(_AC_SITE_KEY), true);
   } catch(e) { console.warn('Firebase SDK init:', e.message); }
 }
 
