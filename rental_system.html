@@ -375,7 +375,7 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
 <div id="login-overlay">
   <div class="login-box">
     <div class="login-logo">🏠</div>
-    <div class="login-title">房東租賃管理系統</div>
+    <div class="login-title">租賃管理系統</div>
     <div class="login-sub" id="login-sub">載入中…</div>
 
     <!-- Setup mode -->
@@ -2566,7 +2566,7 @@ async function sendTelegramTest() {
   try {
     const now = new Date().toLocaleString('zh-TW');
     await _tgPost(state.telegram.botToken, state.telegram.chatId,
-      `🏠 <b>房東租賃管理系統</b>\n✅ 連線測試成功！\n\n戶主：${profileName()}\n房產數量：${state.properties.length} 個\n測試時間：${now}`);
+      `🏠 <b>租賃管理系統</b>\n✅ 連線測試成功！\n\n戶主：${profileName()}\n房產數量：${state.properties.length} 個\n測試時間：${now}`);
     showToast('✅ 測試訊息已送出，請查看 Telegram');
   } catch(e) {
     showToast('❌ 發送失敗：' + e.message + '（請確認 Token 與 Chat ID 正確）');
@@ -2630,7 +2630,7 @@ async function sendTelegramAlert() {
       msg += `\n`;
     });
 
-    msg += `\n<i>此訊息由房東租賃管理系統 v4 產生</i>`;
+    msg += `\n<i>此訊息由租賃管理系統 v4 產生</i>`;
 
     await _tgPost(state.telegram.botToken, state.telegram.chatId, msg);
     showToast(`✅ 通知已送出！${alerts.length ? `（${alerts.length} 筆到期提醒）` : '（無到期租約）'}`);
@@ -3586,7 +3586,7 @@ async function exportXLS() {
     rTot.getCell(8).style = STYLE.total(C.lightBlue); rTot.getCell(8).value='';
 
     ws.addRow([]);
-    const rNote = ws.addRow(['※ 本報表由房東租賃管理系統自動產製。稅務數字僅供試算參考，請諮詢專業會計師。']);
+    const rNote = ws.addRow(['※ 本報表由租賃管理系統自動產製。稅務數字僅供試算參考，請諮詢專業會計師。']);
     ws.mergeCells(rNote.number,1,rNote.number,COLS);
     rNote.height=18; rNote.getCell(1).style=STYLE.note();
   })();
