@@ -1223,9 +1223,8 @@ function renderMapEmbed(p, hasGKey) {
   const addrQ = encodeURIComponent(addrText);
 
   let iframeSrc;
-  if (_mapMode === 'street' && hasGKey) {
-    const loc = (p.lat && p.lng) ? `location=${p.lat},${p.lng}` : `q=${addrQ}`;
-    iframeSrc = `https://www.google.com/maps/embed/v1/streetview?key=${gKey}&${loc}&heading=0&pitch=0&fov=90`;
+  if (_mapMode === 'street' && hasGKey && p.lat && p.lng) {
+    iframeSrc = `https://www.google.com/maps/embed/v1/streetview?key=${gKey}&location=${p.lat},${p.lng}&heading=0&pitch=0&fov=90`;
   } else if (hasGKey) {
     iframeSrc = `https://www.google.com/maps/embed/v1/place?key=${gKey}&q=${addrQ}&language=zh-TW`;
   } else {
