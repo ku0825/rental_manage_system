@@ -1375,7 +1375,7 @@ function renderCashflow() {
     const maintYearTotal = (p.maintenanceLogs||[])
       .filter(l=>l.date&&l.date.startsWith(_cfYear))
       .reduce((s,l)=>s+(l.amount||0),0);
-    const repairM = (maintYearTotal/12) + ((p.insurance||0)/12);
+    const repairM = maintYearTotal + ((p.insurance||0)/12);
     const net = income - mortgage - mgmt - taxesM - repairM;
     return {p, income, mortgage, mgmt, taxesM, repairM, net};
   });
@@ -1401,7 +1401,7 @@ function renderCashflow() {
       <div><div style="color:#888;margin-bottom:2px">房貸月付</div><div style="font-weight:700;color:var(--red)">${mortgage?`-$${fmt(mortgage)}`:'—'}</div></div>
       <div><div style="color:#888;margin-bottom:2px">管理費/月</div><div style="font-weight:700;color:#d4850a}">${mgmt?`-$${fmt(mgmt)}`:'—'}</div></div>
       <div><div style="color:#888;margin-bottom:2px">稅費攤月</div><div style="font-weight:700;color:#888">-$${fmt(taxesM)}</div></div>
-      <div><div style="color:#888;margin-bottom:2px">修繕攤月<span style="font-size:10px;color:#aaa">（實際/年÷12）</span></div><div style="font-weight:700;color:#888">-$${fmt(repairM)}</div></div>
+      <div><div style="color:#888;margin-bottom:2px">本年修繕費<span style="font-size:10px;color:#aaa">（實際）</span></div><div style="font-weight:700;color:#888">-$${fmt(repairM)}</div></div>
       <div><div style="color:#888;margin-bottom:2px">月淨現金流</div><div style="font-size:15px;font-weight:700;color:${net>=0?'var(--green)':'var(--red)'}">$${fmt(net)}</div></div>
     </div>
   </div>`).join('');
@@ -1450,7 +1450,7 @@ function renderCashflow() {
           <div><div style="color:#888;margin-bottom:2px">房貸合計</div><div style="font-weight:700;color:var(--red)">${totalMortgage?`-$${fmt(totalMortgage)}`:'—'}</div></div>
           <div><div style="color:#888;margin-bottom:2px">管理費合計</div><div style="font-weight:700;color:#d4850a">${totalMgmt?`-$${fmt(totalMgmt)}`:'—'}</div></div>
           <div><div style="color:#888;margin-bottom:2px">稅費攤銷</div><div style="font-weight:700;color:#888">-$${fmt(totalTaxes)}</div></div>
-          <div><div style="color:#888;margin-bottom:2px">修繕攤月合計</div><div style="font-weight:700;color:#888">-$${fmt(totalRepair)}</div></div>
+          <div><div style="color:#888;margin-bottom:2px">本年修繕費合計</div><div style="font-weight:700;color:#888">-$${fmt(totalRepair)}</div></div>
           <div><div style="color:#888;margin-bottom:2px">月淨現金流</div><div style="font-size:16px;font-weight:700;color:${totalNet>=0?'var(--green)':'var(--red)'}">$${fmt(totalNet)}</div></div>
         </div>
       </div>`:''}
