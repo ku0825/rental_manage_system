@@ -899,7 +899,8 @@ async function fbDelete(docPath) {
 
 async function fbListUsers() {
   try {
-    const r = await fetch(`${_FB_BASE}/users?key=${_FB_KEY}`);
+    const headers = await _fbHeaders({ 'Content-Type': 'application/json' });
+    const r = await fetch(`${_FB_BASE}/users?key=${_FB_KEY}`, { headers });
     if (!r.ok) return [];
     const json = await r.json();
     const docs = json.documents || [];
@@ -5476,8 +5477,13 @@ async function doLogin() {
   renderView();
   showToast('✅ 登入成功');
   initFS();
-  // Firebase Auth (background — local data already loaded)
-  _faAuth(uname, pwd).catch(e => console.warn('Firebase Auth error:', e.message));
+  // Firebase Auth first, then sync — Firestore rules require request.auth != null
+  _faAuth(uname, pwd)
+    .catch(e => console.warn('Firebase Auth error:', e.message))
+    .finally(() => { fbSyncOnLogin(uname, storedHash); });
+}
+
+async function fbSyncOnLogin(uname, storedHash) {
   // Background: sync with Firebase (upload if empty, download if newer)
   fbGet(`users/${uname}`).then(doc => {
     const raw = _fbR(doc, 'userData');
