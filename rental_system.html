@@ -1,16 +1,16 @@
-﻿<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-<meta charset="UTF-8">
+<!DOCTYPE html>
+<!-- saved from url=(0064)https://ku0825.github.io/rental_manage_system/rental_system.html -->
+<html lang="zh-TW"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>租賃管理系統</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check-compat.js"></script>
+<link rel="stylesheet" href="./租賃管理系統_files/bootstrap.min.css">
+<script type="text/javascript" async="" charset="utf-8" src="./租賃管理系統_files/recaptcha__zh_tw.js.下載" crossorigin="anonymous" integrity="sha384-T1cnZ2RIr07Ws7UFmqKpCZDg/IQKlUEVkZqTPE/H2sCARs9P/OSripFwMs1qUBsC"></script><script src="./租賃管理系統_files/chart.umd.min.js.下載"></script>
+<link rel="stylesheet" href="./租賃管理系統_files/leaflet.min.css">
+<script src="./租賃管理系統_files/leaflet.min.js.下載"></script>
+<script src="./租賃管理系統_files/exceljs.min.js.下載"></script>
+<script src="./租賃管理系統_files/firebase-app-compat.js.下載"></script>
+<script src="./租賃管理系統_files/firebase-app-check-compat.js.下載"></script>
 <style>
 :root {
   --primary: #1b3a6e; --primary-light: #2d5a9e;
@@ -368,18 +368,18 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
 .cf-cell { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
 .cf-hdr { background: #f6f8fb; font-weight: 600; font-size: 11px; color: #555; }
 </style>
-</head>
+<script src="./租賃管理系統_files/enterprise.js.下載"></script></head>
 <body>
 
 <!-- Login Overlay -->
-<div id="login-overlay">
+<div id="login-overlay" style="display: none;">
   <div class="login-box">
     <div class="login-logo">🏠</div>
     <div class="login-title">租賃管理系統</div>
-    <div class="login-sub" id="login-sub">載入中…</div>
+    <div class="login-sub" id="login-sub">首次使用 / 已有帳號請輸入相同名稱與密碼</div>
 
     <!-- Setup mode -->
-    <div id="login-setup-section" style="display:none">
+    <div id="login-setup-section" style="display: block;">
       <label class="login-label">您的名稱／代號</label>
       <input class="login-input" type="text" id="setup-username" placeholder="例：Jason" maxlength="20" autocomplete="username">
       <label class="login-label">設定密碼</label>
@@ -393,8 +393,7 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
     <!-- Login mode -->
     <div id="login-login-section" style="display:none">
       <label class="login-label" id="login-name-label">密碼</label>
-      <input class="login-input" type="password" id="login-pwd" placeholder="輸入密碼" autocomplete="current-password"
-        onkeydown="if(event.key==='Enter')doLogin()">
+      <input class="login-input" type="password" id="login-pwd" placeholder="輸入密碼" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
       <button class="login-btn" onclick="doLogin()">登入</button>
       <div class="login-err" id="login-err"></div>
       <div class="login-reset-link" onclick="doResetPrompt()">忘記密碼？重設帳號</div>
@@ -427,8 +426,7 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
     <!-- Admin Login -->
     <div id="admin-login-section" style="display:none">
       <label class="login-label" style="color:rgba(255,200,200,.7)" id="admin-login-label">管理員密碼</label>
-      <input class="login-input" type="password" id="admin-login-pwd" placeholder="輸入密碼"
-        onkeydown="if(event.key==='Enter')doAdminLogin()">
+      <input class="login-input" type="password" id="admin-login-pwd" placeholder="輸入密碼" onkeydown="if(event.key==='Enter')doAdminLogin()">
       <button class="login-btn" style="background:#6b0000" onclick="doAdminLogin()">進入後台</button>
       <div class="login-err" id="admin-login-err"></div>
     </div>
@@ -462,44 +460,44 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
   <div style="padding:10px 0">
     <div class="nav-section">主要功能</div>
     <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard">
-      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
       總覽儀表板
     </div>
     <div class="nav-item" onclick="navigate('properties')" id="nav-properties">
-      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
       我的房產
     </div>
     <div class="nav-section">財務分析</div>
     <div class="nav-item" onclick="navigate('tax')" id="nav-tax">
-      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
       稅務試算
     </div>
     <div class="nav-item" onclick="navigate('market')" id="nav-market">
-      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
       市場比較
     </div>
     <div class="nav-section">工具</div>
     <div class="nav-item" onclick="navigate('map')" id="nav-map">
-      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
       地圖檢視
     </div>
     <div class="nav-item" onclick="navigate('cashflow')" id="nav-cashflow">
-      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
       現金流試算
     </div>
     <div class="nav-item" onclick="navigate('calc')" id="nav-calc">
-      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
       扣繳計算機
     </div>
     <div class="nav-section">設定</div>
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings">
-      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
       個人稅務設定
     </div>
   </div>
   <div style="padding:6px 12px 10px">
     <button class="nav-add-btn" onclick="openPropertyModal(null)">
-      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
       新增房產
     </button>
   </div>
@@ -508,7 +506,7 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
 
 <!-- Profile bar -->
 <div class="profile-bar no-print" id="profile-bar" style="margin-left:var(--sidebar-w)">
-  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
   <input type="text" id="username-input" placeholder="顯示名稱（選填）" maxlength="20" title="可自訂顯示名稱，不影響登入帳號" oninput="state.profile.displayName=this.value" onblur="saveDisplayName(this.value)" onkeydown="if(event.key==='Enter')this.blur()">
   <span class="pb-sep">|</span>
   <button class="pb-btn" onclick="exportJSON()">⬇ 匯出 JSON</button>
@@ -520,7 +518,7 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
   <button class="pb-btn" onclick="sendTelegramAlert()" id="tg-btn" style="background:rgba(39,174,96,.25);border-color:rgba(39,174,96,.5)" title="發送租約到期提醒到 Telegram">📱 Telegram 通知</button>
   <input type="file" id="import-input" accept=".json" style="display:none" onchange="importJSON(this)">
   <span class="pb-sep">|</span>
-  <span id="folder-status-wrap" style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;max-width:180px"></span>
+  <span id="folder-status-wrap" style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;max-width:180px"><button class="pb-btn" onclick="pickFolder()" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3);font-size:11px;padding:3px 8px" title="選擇存放資料夾，之後自動儲存到 rental_data.json">📂 選擇資料夾</button></span>
   <span style="margin-left:auto;opacity:.5;font-size:11px;white-space:nowrap;flex-shrink:0" id="last-saved-label"></span>
   <button class="pb-btn" onclick="doLogout()" style="background:rgba(192,57,43,.2);border-color:rgba(192,57,43,.5)" title="登出系統">🔒 登出</button>
 </div>
@@ -528,11 +526,77 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
 <!-- Print header: lives OUTSIDE main-content so it's never wiped by renderView() -->
 <div class="print-header" id="print-header" style="margin-left:var(--sidebar-w);padding:20px 26px 14px">
   <h1>🏠 房東租賃分析報告</h1>
-  <div class="ph-sub" id="print-meta"></div>
+  <div class="ph-sub" id="print-meta">戶主：sunfamily ／ 列印日期：2026/10/7 ／ 共 4 個房產</div>
 </div>
 
 <!-- Main content -->
-<main class="main" id="main-content" style="padding-top:8px"></main>
+<main class="main" id="main-content" style="padding-top:8px">
+  <div class="page-title">📊 總覽儀表板</div>
+  <div class="page-subtitle">共 4 個房產 · 所有數字以年計算</div>
+  <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:10px">
+    <div class="stat-card"><div class="s-label">月租金合計（帳面）</div><div class="s-value">$401,048</div><div class="s-sub">月實收 $352,617（扣健保/代扣）</div></div>
+    <div class="stat-card accent"><div class="s-label">補充保費（年）</div><div class="s-value" style="font-size:19px">$99,918</div><div class="s-sub">公司承租≥$20,000才適用，費率2.11%</div></div>
+    <div class="stat-card" style="border-left:4px solid #7c3aed"><div class="s-label">10%代扣所得稅（年）</div><div class="s-value" style="font-size:19px;color:#7c3aed">$481,258</div><div class="s-sub">公司代扣，年底申報可全額抵繳</div></div>
+  </div>
+  <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat-card yellow"><div class="s-label">預估租賃稅負（年）</div><div class="s-value" style="font-size:19px">$329,134</div><div class="s-sub">邊際稅率 20.00%；估退稅 $152,124</div></div>
+    <div class="stat-card green"><div class="s-label">稅後淨年收</div><div class="s-value" style="font-size:19px">$4,383,524</div><div class="s-sub">月均 $365,294</div></div>
+    <div class="stat-card"><div class="s-label">實際保留率</div><div class="s-value" style="font-size:19px">91.08%</div><div class="s-sub">扣健保+租賃稅（未含10%抵繳時序）</div></div>
+  </div>
+  <div class="two-col">
+    <div class="card"><div class="card-hdr">租金分佈（月）</div><div class="card-body"><div style="height:210px"><canvas id="chart-donut" width="708" height="262" style="display: block; box-sizing: border-box; height: 210px; width: 566px;"></canvas></div></div></div>
+    <div class="card"><div class="card-hdr">收益拆解（年）</div><div class="card-body"><div style="height:210px"><canvas id="chart-bar" width="708" height="262" style="display: block; box-sizing: border-box; height: 210px; width: 566px;"></canvas></div></div></div>
+  </div>
+  
+  <div style="margin-bottom:20px">
+    <div style="font-size:15px;font-weight:700;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;gap:8px">
+      ⏰ 租約到期提醒
+      <span style="font-size:11px;font-weight:400;color:#888">（90天內）</span>
+    </div>
+    <div class="lease-alert-grid">
+      <div class="lease-alert-card lac-expired" style="cursor:pointer" onclick="navigate('properties')">
+          <div style="font-weight:700;font-size:13px;color:var(--primary)">97-24F 捷易電商(停車位B3-045)</div>
+          <div style="font-size:11px;color:#888">桃園區 · $72,999/月 · 公司行號</div>
+          <div style="font-size:19px;font-weight:700;color:#999;margin:6px 0 2px">已到期 7 天</div>
+          <div style="font-size:11px;color:#aaa">到期日：2026/09/30</div>
+        </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hdr">房產明細 <button class="btn-acc btn-sm no-print" onclick="openPropertyModal(null)">+ 新增</button></div>
+    <div class="card-body" style="padding:0">
+      <table class="tbl"><thead><tr><th>房產</th><th>月租金</th><th>補充保費/月</th><th>租賃所得（年）</th><th>租金報酬率</th><th>市場比較</th></tr></thead>
+      <tbody><tr>
+      <td><div style="font-weight:700;color:var(--primary)">1127-風澤</div><div style="font-size:11px;color:#999">桃園區 · 0坪</div></td>
+      <td>$183,000<div style="font-size:10px;color:#aaa">實收 $160,839</div></td>
+      <td><span class="bdg bdg-yellow">$3,861/月</span><div style="font-size:10px;color:#aaa">扣繳 $18,300/月</div></td>
+      <td>$1,251,720</td>
+      <td>—</td>
+      <td><span class="bdg bdg-blue">符合行情</span></td>
+    </tr><tr>
+      <td><div style="font-weight:700;color:var(--primary)">里仁</div><div style="font-size:11px;color:#999">中壢市 · 0坪</div></td>
+      <td>$67,800<div style="font-size:10px;color:#aaa">實收 $59,725</div></td>
+      <td><span class="bdg bdg-yellow">$1,295/月</span><div style="font-size:10px;color:#aaa">扣繳 $6,780/月</div></td>
+      <td>$463,752</td>
+      <td>—</td>
+      <td><span class="bdg bdg-blue">符合行情</span></td>
+    </tr><tr>
+      <td><div style="font-weight:700;color:var(--primary)">97-24F 捷易電商(停車位B3-045)</div><div style="font-size:11px;color:#999">桃園區 · 0坪</div></td>
+      <td>$72,999<div style="font-size:10px;color:#aaa">實收 $64,159</div></td>
+      <td><span class="bdg bdg-yellow">$1,540/月</span><div style="font-size:10px;color:#aaa">扣繳 $7,300/月</div></td>
+      <td>$499,313</td>
+      <td>—</td>
+      <td><span class="bdg bdg-red">低於行情 8.75%</span></td>
+    </tr><tr>
+      <td><div style="font-weight:700;color:var(--primary)">99-24F 土豆不動產</div><div style="font-size:11px;color:#999">桃園區 · 0坪</div></td>
+      <td>$77,249<div style="font-size:10px;color:#aaa">實收 $67,894</div></td>
+      <td><span class="bdg bdg-yellow">$1,630/月</span><div style="font-size:10px;color:#aaa">扣繳 $7,725/月</div></td>
+      <td>$528,383</td>
+      <td>—</td>
+      <td><span class="bdg bdg-red">低於行情 8.04%</span></td>
+    </tr></tbody></table>
+    </div>
+  </div></main>
 
 <!-- Property Modal -->
 <div class="modal-overlay" id="prop-modal" style="display:none">
@@ -585,7 +649,7 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
 <!-- Photo Lightbox -->
 <div class="photo-lb" id="photo-lb" style="display:none" onclick="closeMaintPhotoLb()">
   <button class="photo-lb-close" onclick="closeMaintPhotoLb()">✕</button>
-  <img src="" alt="照片預覽" onclick="event.stopPropagation()">
+  <img src="https://ku0825.github.io/rental_manage_system/rental_system.html" alt="照片預覽" onclick="event.stopPropagation()">
 </div>
 
 <!-- Lease Files Modal -->
@@ -638,7 +702,7 @@ textarea.paste-area:focus { border-color: var(--primary-light); }
 </div>
 
 <!-- Toast -->
-<div id="toast" style="position:fixed;bottom:24px;right:24px;background:#222;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:1000;display:none;box-shadow:0 4px 14px rgba(0,0,0,.25)"></div>
+<div id="toast" style="position: fixed; bottom: 24px; right: 24px; background: rgb(34, 34, 34); color: rgb(255, 255, 255); padding: 10px 18px; border-radius: 8px; font-size: 13px; z-index: 1000; display: none; box-shadow: rgba(0, 0, 0, 0.25) 0px 4px 14px;">☁️ 已從雲端同步帳號資料，歡迎回來！</div>
 
 <script>
 // ============================================================
@@ -1049,6 +1113,13 @@ function rentStatus(p) {
   return {label:'符合行情',cls:'bdg-blue'};
 }
 
+// 新合約偵測：若有任何 active 租約文件的上傳日 >= leaseEnd，視為已更新
+function leaseHasNewContract(p) {
+  if (!p.leaseEnd) return false;
+  const active = (p.leaseFiles || []).filter(f => f.status === 'active');
+  return active.some(f => f.uploadedAt && f.uploadedAt >= p.leaseEnd);
+}
+
 // ============================================================
 // NAVIGATION
 // ============================================================
@@ -1179,13 +1250,16 @@ function renderLeaseCountdown() {
     </div>
     <div class="lease-alert-grid">
       ${alerts.map(p=>{
-        const cls = p.daysLeft<0?'lac-expired':p.daysLeft<=30?'lac-urgent':'lac-soon';
-        const color = p.daysLeft<0?'#999':p.daysLeft<=30?'var(--red)':'var(--yellow)';
-        const label = p.daysLeft<0?`已到期 ${Math.abs(p.daysLeft)} 天`:`${p.daysLeft} 天後到期`;
+        const hasNew = leaseHasNewContract(p);
+        const cls = hasNew ? 'lac-soon' : (p.daysLeft<0?'lac-expired':p.daysLeft<=30?'lac-urgent':'lac-soon');
+        const color = hasNew ? '#16a34a' : (p.daysLeft<0?'#999':p.daysLeft<=30?'var(--red)':'var(--yellow)');
+        const label = hasNew
+          ? '📄 新約已上傳，請更新到期日'
+          : (p.daysLeft<0?`已到期 ${Math.abs(p.daysLeft)} 天`:`${p.daysLeft} 天後到期`);
         return `<div class="lease-alert-card ${cls}" style="cursor:pointer" onclick="navigate('properties')">
           <div style="font-weight:700;font-size:13px;color:var(--primary)">${p.name}</div>
           <div style="font-size:11px;color:#888">${p.district} · $${fmt(propMonthly(p))}/月 · ${tenantLabel(p.tenantType)}</div>
-          <div style="font-size:19px;font-weight:700;color:${color};margin:6px 0 2px">${label}</div>
+          <div style="font-size:${hasNew?'13':'19'}px;font-weight:700;color:${color};margin:6px 0 2px">${label}</div>
           <div style="font-size:11px;color:#aaa">到期日：${fmtDate(p.leaseEnd)}</div>
         </div>`;
       }).join('')}
@@ -1670,8 +1744,11 @@ function renderPropCard(p) {
   const yieldPill = yd !== null
     ? `<span style="background:#eafaf1;color:#16a34a;border:1px solid #bbf7d0;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700">${fmtPct(yd)}</span>`
     : `<span style="background:#f3f4f6;color:#9ca3af;border-radius:20px;padding:2px 10px;font-size:11px">未設定</span>`;
+  const hasNewFile = leaseHasNewContract(p);
   const dlBadge = daysLeft !== null
-    ? `<span style="font-size:11px;color:${daysLeft<0?'#e74c3c':daysLeft<60?'#f39c12':'#888'}">${daysLeft>=0?daysLeft+'天後到期':'⚠️已到期'}</span>`
+    ? (hasNewFile && daysLeft <= 90
+        ? `<span style="font-size:11px;color:#16a34a">📄 新約已上傳</span>`
+        : `<span style="font-size:11px;color:${daysLeft<0?'#e74c3c':daysLeft<60?'#f39c12':'#888'}">${daysLeft>=0?daysLeft+'天後到期':'⚠️已到期'}</span>`)
     : '';
   return `
   <div class="prop-card">
@@ -1782,7 +1859,15 @@ function renderPropTable() {
     const net = propNetMonthly(p), m = propMonthly(p), yd = propYield(p), rs = rentStatus(p);
     const leaseEnd = p.leaseEnd ? fmtDate(p.leaseEnd) : '—';
     const daysLeft = p.leaseEnd ? Math.ceil((new Date(p.leaseEnd)-new Date())/86400000) : null;
-    const dlCls = daysLeft !== null ? (daysLeft < 0 ? 'color:#e74c3c' : daysLeft < 60 ? 'color:#f39c12' : 'color:#888') : '';
+    const hasNew = leaseHasNewContract(p);
+    const dlCls = hasNew && daysLeft !== null && daysLeft <= 90
+      ? 'color:#16a34a'
+      : (daysLeft !== null ? (daysLeft < 0 ? 'color:#e74c3c' : daysLeft < 60 ? 'color:#f39c12' : 'color:#888') : '');
+    const dlSub = daysLeft !== null
+      ? (hasNew && daysLeft <= 90
+          ? '📄 新約已上傳'
+          : (daysLeft >= 0 ? daysLeft+'天後到期' : '已到期'))
+      : '';
     return `<tr>
       <td>
         <div style="font-weight:700;color:var(--primary);font-size:13px">${p.name}</div>
@@ -1800,7 +1885,7 @@ function renderPropTable() {
       </td>
       <td style="text-align:center">
         <div style="font-size:12px;${dlCls}">${leaseEnd}</div>
-        ${daysLeft !== null ? `<div style="font-size:10px;color:#bbb">${daysLeft >= 0 ? daysLeft+'天後到期' : '已到期'}</div>` : ''}
+        ${daysLeft !== null ? `<div style="font-size:10px;color:${hasNew&&daysLeft<=90?'#16a34a':'#bbb'}">${dlSub}</div>` : ''}
       </td>
       <td style="text-align:center">
         ${yd !== null ? `<span style="background:#eafaf1;color:#16a34a;border-radius:20px;padding:3px 10px;font-size:13px;font-weight:700">${fmtPct(yd)}</span>` : '<span style="color:#bbb;font-size:12px">未設定</span>'}
@@ -2609,10 +2694,11 @@ async function sendTelegramAlert() {
       msg += `⏰ <b>${days} 天內到期租約（${alerts.length} 筆）</b>\n`;
       msg += `${'─'.repeat(28)}\n`;
       alerts.forEach(p => {
-        const icon = p.daysLeft < 0 ? '🔴' : p.daysLeft <= 30 ? '🟠' : '🟡';
-        const label = p.daysLeft < 0
-          ? `已到期 ${Math.abs(p.daysLeft)} 天`
-          : `${p.daysLeft} 天後到期`;
+        const hasNew = leaseHasNewContract(p);
+        const icon = hasNew ? '📄' : (p.daysLeft < 0 ? '🔴' : p.daysLeft <= 30 ? '🟠' : '🟡');
+        const label = hasNew
+          ? `新合約已上傳（請更新到期日）`
+          : (p.daysLeft < 0 ? `已到期 ${Math.abs(p.daysLeft)} 天` : `${p.daysLeft} 天後到期`);
         msg += `${icon} <b>${p.name}</b>\n`;
         msg += `   ${p.city} ${p.district} | $${fmt(propMonthly(p))}/月 | ${tenantLabel(p.tenantType)}\n`;
         msg += `   到期日：${fmtDate(p.leaseEnd)}  ⟶  <b>${label}</b>\n\n`;
@@ -4037,6 +4123,13 @@ async function handleLeaseFileUpload(propId, input) {
   }
   renderView(); saveUserData();
   showToast('✅ 已上傳 ' + files.length + ' 個租約文件（含雲端備份）');
+  // 若目前租約已到期或即將到期，提示更新到期日
+  if (p.leaseEnd) {
+    const dl = Math.ceil((new Date(p.leaseEnd) - new Date()) / 86400000);
+    if (dl <= 90) {
+      setTimeout(() => showToast('📝 偵測到新合約已上傳，請記得在「編輯」中更新租約到期日'), 1800);
+    }
+  }
   if (document.getElementById('lease-modal').style.display !== 'none') openLeaseModal(propId);
   input.value = '';
 }
@@ -5637,5 +5730,6 @@ _faRestoreSession(); // restore Firebase Auth token from localStorage (backgroun
 initLoginScreen();
 renderView();
 </script>
-</body>
-</html>
+
+
+<div id="fire_app_check_[DEFAULT]" style="display: none;"><div class="grecaptcha-badge" data-style="bottomright" style="width: 256px; height: 60px; display: block; transition: right 0.3s; position: fixed; bottom: 14px; right: -186px; box-shadow: gray 0px 0px 5px; border-radius: 2px; overflow: hidden;"><div class="grecaptcha-logo"><iframe title="reCAPTCHA" width="256" height="60" role="presentation" name="a-5wn6opou7div" frameborder="0" scrolling="no" sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-top-navigation allow-modals allow-popups-to-escape-sandbox allow-storage-access-by-user-activation" src="./租賃管理系統_files/anchor.html"></iframe></div><div class="grecaptcha-error"></div><textarea id="g-recaptcha-response" name="g-recaptcha-response" class="g-recaptcha-response" style="width: 250px; height: 40px; border: 1px solid rgb(193, 193, 193); margin: 10px 25px; padding: 0px; resize: none; display: none;"></textarea></div><iframe style="display: none;" src="./租賃管理系統_files/saved_resource(1).html"></iframe></div></body></html>
