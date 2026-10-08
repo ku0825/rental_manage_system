@@ -1113,11 +1113,13 @@ function rentStatus(p) {
   return {label:'符合行情',cls:'bdg-blue'};
 }
 
-// 新合約偵測：若有任何 active 租約文件的上傳日 >= leaseEnd，視為已更新
+// 新合約偵測：租約到期或即將到期（90天內）且有任何 active 文件，視為已上傳新約
 function leaseHasNewContract(p) {
   if (!p.leaseEnd) return false;
+  const daysLeft = Math.ceil((new Date(p.leaseEnd) - new Date()) / 86400000);
+  if (daysLeft > 90) return false; // 不在警示區間，不偵測
   const active = (p.leaseFiles || []).filter(f => f.status === 'active');
-  return active.some(f => f.uploadedAt && f.uploadedAt >= p.leaseEnd);
+  return active.length > 0;
 }
 
 // ============================================================
